@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Scroll, ScanLine, Trophy, CheckCircle2, AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/db';
+import confetti from 'canvas-confetti';
 
 export default function Tablero() {
   const router = useRouter();
@@ -11,6 +13,9 @@ export default function Tablero() {
   const [winner, setWinner] = useState<string | null>(null);
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+  const [lockUntil, setLockUntil] = useState<number | null>(null);
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
   
   const [code, setCode] = useState('');
   const [msg, setMsg] = useState({ text: '', type: '' });
@@ -22,7 +27,13 @@ export default function Tablero() {
       const resUsers = await fetch('/api/users');
       const dataUsers = await resUsers.json();
       setUsers(dataUsers.users);
-      setWinner(dataUsers.winner);
+      
+      setWinner((prevWinner) => {
+        if (dataUsers.winner && !prevWinner) {
+           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, zIndex: 9999 });
+        }
+        return dataUsers.winner;
+      });
       
       const myUser = dataUsers.users.find((u: any) => u.id === userId);
       if (myUser) setMe(myUser);
@@ -42,12 +53,51 @@ export default function Tablero() {
       return;
     }
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    const channel = supabase.channel('realtime-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const storedLock = localStorage.getItem('lockUntil');
+    if (storedLock && parseInt(storedLock) > Date.now()) {
+      setLockUntil(parseInt(storedLock));
+    }
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [router]);
+
+  useEffect(() => {
+    if (lockUntil && lockUntil > Date.now()) {
+      const interval = setInterval(() => {
+        const left = Math.ceil((lockUntil - Date.now()) / 1000);
+        if (left <= 0) {
+          setLockUntil(null);
+          setLockSecondsLeft(0);
+          clearInterval(interval);
+        } else {
+          setLockSecondsLeft(left);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setLockUntil(null);
+    }
+  }, [lockUntil]);
 
   const handleSubmit = async (submitCode: string) => {
     if (!submitCode.trim()) return;
+    if (lockUntil && lockUntil > Date.now()) {
+      setMsg({ text: 'Estás congelado. Espera a que pase el tiempo.', type: 'error' });
+      return;
+    }
+
     setLoading(true);
     setMsg({ text: '', type: '' });
     
@@ -62,9 +112,27 @@ export default function Tablero() {
       if (res.ok) {
         setMsg({ text: data.message, type: 'success' });
         setCode('');
+        localStorage.setItem('fails', '0');
         fetchData();
+        if (data.isWinner) {
+           confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 }, zIndex: 9999 });
+        }
       } else {
-        setMsg({ text: data.error, type: 'error' });
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 500);
+
+        let fails = parseInt(localStorage.getItem('fails') || '0') + 1;
+        if (fails >= 3) {
+          const newLock = Date.now() + 30000;
+          localStorage.setItem('lockUntil', newLock.toString());
+          localStorage.setItem('fails', '0');
+          setLockUntil(newLock);
+          setLockSecondsLeft(30);
+          setMsg({ text: '¡Demasiados errores! Has sido congelado por 30 segundos.', type: 'error' });
+        } else {
+          localStorage.setItem('fails', fails.toString());
+          setMsg({ text: data.error, type: 'error' });
+        }
       }
     } catch (e) {
       setMsg({ text: 'Error de conexión', type: 'error' });
@@ -74,12 +142,21 @@ export default function Tablero() {
 
   if (!me) return <div style={{padding: '2rem', textAlign: 'center', color: 'var(--accent-primary)'}}>Adentrándose en la jungla...</div>;
 
+  const isLocked = lockUntil !== null && lockSecondsLeft > 0;
+
   return (
     <>
       <main className="container">
         {winner && (
           <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
             🥁 ¡JUMANJI! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
+          </div>
+        )}
+
+        {isLocked && (
+          <div style={{background: 'rgba(255, 0, 0, 0.2)', border: '2px solid red', color: '#ff6b6b', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.2rem', animation: 'shake 0.5s'}}>
+            ❄️ ¡CONGELADO! ❄️<br/>
+            <span style={{fontSize: '1rem'}}>Demasiados intentos fallidos. Espera {lockSecondsLeft} segundos.</span>
           </div>
         )}
 
@@ -104,8 +181,8 @@ export default function Tablero() {
               <p style={{textAlign: 'center', color: 'var(--text-muted)'}}>La jungla está en paz por ahora...</p>
             ) : (
               missions.map(m => (
-                <div key={m.id} className={`mission-card ${m.isFoundByMe ? 'completed' : ''}`} onClick={() => {
-                  if(!m.isFoundByMe) {
+                <div key={m.id} className={`mission-card ${m.isFoundByMe ? 'completed' : ''} ${isShaking && !m.isFoundByMe ? 'shake' : ''}`} onClick={() => {
+                  if(!m.isFoundByMe && !isLocked) {
                     const ans = prompt(`Misión: ${m.title}\n\nAcertijo: ${m.hint}\n\nIngresa tu respuesta (el objeto o código):`);
                     if(ans) handleSubmit(ans);
                   }
@@ -138,10 +215,11 @@ export default function Tablero() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="Ej: BANANA"
-                className="input-spooky"
+                className={`input-spooky ${isShaking ? 'shake' : ''}`}
+                disabled={isLocked}
               />
-              <button className="btn-slime" onClick={() => handleSubmit(code)} disabled={loading}>
-                {loading ? 'Verificando...' : 'VALIDAR CÓDIGO'}
+              <button className="btn-slime" onClick={() => handleSubmit(code)} disabled={loading || isLocked}>
+                {loading ? 'Verificando...' : (isLocked ? 'CONGELADO' : 'VALIDAR CÓDIGO')}
               </button>
 
               {msg.text && (

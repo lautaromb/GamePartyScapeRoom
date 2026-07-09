@@ -177,3 +177,17 @@ body {
   background: rgba(255, 179, 0, 0.2);
   transform: scale(1.2);
 }
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-10px) rotate(-2deg); }
+  40% { transform: translateX(10px) rotate(2deg); }
+  60% { transform: translateX(-10px) rotate(-2deg); }
+  80% { transform: translateX(10px) rotate(2deg); }
+  100% { transform: translateX(0); }
+}
+.shake {
+  animation: shake 0.5s ease-in-out;
+  border-color: #ff3333 !important;
+  box-shadow: 0 0 15px rgba(255, 51, 51, 0.5) !important;
+}
