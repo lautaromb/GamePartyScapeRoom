@@ -5,6 +5,14 @@ import { Scroll, ScanLine, Trophy, CheckCircle2, AlertCircle } from 'lucide-reac
 import { supabase } from '@/lib/db';
 import confetti from 'canvas-confetti';
 
+const TROPHIES_DATA: Record<string, {emoji: string, desc: string}> = {
+  'Cerebrito': {emoji: '🧠', desc: '5 preguntas correctas al hilo'},
+  'Sabueso': {emoji: '🐕', desc: 'Encontraste 3 pistas antes que todos'},
+  'Francia': {emoji: '🥈', desc: 'Segundo lugar en rapidez 3 veces seguidas'},
+  'Pepe Argento': {emoji: '⚽', desc: 'Respondiste bien 3 preguntas sobre deportes'},
+  'Pistolero': {emoji: '🔫', desc: 'Respondiste primero 3 veces seguidas'}
+};
+
 export default function Tablero() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('misiones'); 
@@ -28,6 +36,13 @@ export default function Tablero() {
   const [eventTimeLeft, setEventTimeLeft] = useState(45);
   const [eventDone, setEventDone] = useState(false);
   const [eventResults, setEventResults] = useState<any>(null);
+
+  // Floating Toast UI
+  const [toast, setToast] = useState<{text: string, type: 'success'|'error'|'info'} | null>(null);
+  const showToast = (text: string, type: 'success'|'error'|'info' = 'info') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Avoid closure issues
   const activeEventRef = useRef(activeEvent);
@@ -151,14 +166,13 @@ export default function Tablero() {
       if (dataEv.event) {
         setActiveEvent(dataEv.event);
         setEventCategory(null);
-        setHasSubmitted(false);
         setEventDone(false);
         setEventResults(null);
       } else {
-        alert("Aún no hay ningún evento activo. ¡Esperá el aviso por micrófono!");
+        showToast("Aún no hay ningún evento activo. ¡Esperá el aviso por micrófono!", 'error');
       }
     } catch (e) {
-      alert("Error de conexión al buscar el evento.");
+      showToast("Error de conexión al buscar el evento.", 'error');
     }
     setLoading(false);
   };
@@ -233,13 +247,13 @@ export default function Tablero() {
     setHasSubmitted(true);
     setLoading(false);
     
-    // Alerta temporal, igual ahora verán los resultados en vivo.
+    // Alerta personalizada en vez de nativa
     if (data.isCorrect) {
-      alert('¡Respuesta enviada! Es correcta. Espera los resultados.');
+      showToast('¡Respuesta enviada!', 'success');
     } else if (res.ok) {
-      alert('Respuesta enviada. Espera los resultados.');
+      showToast('¡Respuesta enviada!', 'info');
     } else {
-      alert(data.error || 'Error al enviar');
+      showToast(data.error || 'Error al enviar', 'error');
     }
   };
 
@@ -296,11 +310,33 @@ export default function Tablero() {
 
   const isLocked = lockUntil !== null && lockSecondsLeft > 0;
 
-  // EVENT OVERLAY UI
-  if (activeEvent) {
-    return (
-      <main className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', background: '#0a0a0a', zIndex: 100, position: 'relative' }}>
-        <h1 className="spooky-title" style={{ fontSize: '2.5rem', animation: 'pulse 1.5s infinite' }}>🚨 EVENTO GLOBAL 🚨</h1>
+  return (
+    <>
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: toast.type === 'error' ? 'rgba(255,50,50,0.9)' : toast.type === 'success' ? 'rgba(50,255,50,0.9)' : 'rgba(0,0,0,0.8)',
+          color: '#fff',
+          padding: '12px 24px',
+          borderRadius: '30px',
+          boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
+          animation: 'pulse 1s',
+          fontWeight: 'bold',
+          backdropFilter: 'blur(10px)',
+          border: `1px solid ${toast.type === 'error' ? '#ff6b6b' : toast.type === 'success' ? '#22c55e' : 'var(--accent-primary)'}`
+        }}>
+          {toast.text}
+        </div>
+      )}
+
+      {/* EVENT OVERLAY UI */}
+      {activeEvent ? (
+        <main className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', background: '#0a0a0a', zIndex: 100, position: 'relative' }}>
+          <h1 className="spooky-title" style={{ fontSize: '2.5rem', animation: 'pulse 1.5s infinite' }}>🚨 EVENTO GLOBAL 🚨</h1>
         
         {!eventDone ? (
           <>
@@ -448,19 +484,16 @@ export default function Tablero() {
             </button>
           </div>
         )}
-      </main>
-    );
-  }
-
-  // NORMAL GAME UI
-  return (
-    <>
-      <main className="container">
-        {winner && (
-          <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
-            🥁 ¡mis 30 - Lautaro! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
-          </div>
-        )}
+        </main>
+      ) : (
+        // NORMAL GAME UI
+        <>
+          <main className="container">
+            {winner && (
+              <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
+                🥁 ¡mis 30 - Lautaro! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
+              </div>
+            )}
 
         {isLocked && (
           <div style={{background: 'rgba(255, 0, 0, 0.2)', border: '2px solid red', color: '#ff6b6b', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.2rem', animation: 'shake 0.5s'}}>
@@ -571,6 +604,20 @@ export default function Tablero() {
                   <div style={{ fontSize: '1.5rem', margin: '0 10px' }}>{u.avatar}</div>
                   <div style={{ flex: 1, fontSize: '1.1rem', fontWeight: u.id === me?.id ? 'bold' : 'normal', color: u.id === me?.id ? 'var(--accent-primary)' : 'inherit' }}>
                     {u.nickname} {u.id === me?.id ? '(Tú)' : ''}
+                    {(u.trophies && u.trophies.length > 0) && (
+                      <div style={{display: 'flex', gap: '5px', marginTop: '8px', flexWrap: 'wrap'}}>
+                        {u.trophies.map((t: string) => (
+                          <div 
+                            key={t} 
+                            onClick={() => showToast(`${t}: ${TROPHIES_DATA[t]?.desc}`, 'info')} 
+                            style={{cursor: 'pointer', background: 'linear-gradient(45deg, #ffd700, #ffb300)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', boxShadow: '0 2px 5px rgba(0,0,0,0.5)'}}
+                            title={TROPHIES_DATA[t]?.desc}
+                          >
+                            {TROPHIES_DATA[t]?.emoji}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                     {u.score} pts
@@ -596,6 +643,8 @@ export default function Tablero() {
           <span>RANKING</span>
         </div>
       </nav>
+        </>
+      )}
     </>
   );
 }

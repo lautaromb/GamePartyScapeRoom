@@ -119,7 +119,7 @@ export default function AdminSecreto() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminPassword: password, id, status: 'active' })
     });
-    fetchData();
+    fetchEvents();
   };
 
   const handleOpenWaitingRoom = async (id: string) => {
@@ -128,7 +128,7 @@ export default function AdminSecreto() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminPassword: password, id, status: 'waiting' })
     });
-    fetchData();
+    fetchEvents();
   };
 
   const handleFinishEvent = async (id: string) => {

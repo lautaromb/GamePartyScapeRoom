@@ -52,11 +52,21 @@ export async function POST(req: Request) {
 
   if (updateCodeError) return NextResponse.json({ error: updateCodeError.message }, { status: 500 });
 
-  // 6. Actualizar puntaje del usuario
+  // 6. Actualizar puntaje y trofeos del usuario
   const newScore = user.score + pointsToAward;
+  let stats = user.stats || {};
+  let trophies = user.trophies || [];
+
+  if (isFirst) {
+    stats.first_finder_count = (stats.first_finder_count || 0) + 1;
+    if (stats.first_finder_count >= 3 && !trophies.includes('Sabueso')) {
+      trophies.push('Sabueso');
+    }
+  }
+
   const { error: updateUserError } = await supabase
     .from('users')
-    .update({ score: newScore })
+    .update({ score: newScore, stats, trophies })
     .eq('id', userId);
 
   if (updateUserError) return NextResponse.json({ error: updateUserError.message }, { status: 500 });
