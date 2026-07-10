@@ -31,9 +31,28 @@ export async function POST(req: Request) {
     .select('*')
     .eq('code', upperCode);
 
-  if (codesError || !codes || codes.length === 0) {
-    return NextResponse.json({ error: 'Ese código no existe o está mal escrito...' }, { status: 400 });
+  let stats = user.stats || {};
+  
+  if (stats.locked_until && Date.now() < stats.locked_until) {
+    return NextResponse.json({ error: 'Estás congelado. Espera a que termine tu penalización.' }, { status: 429 });
   }
+
+  if (codesError || !codes || codes.length === 0) {
+    stats.failed_attempts = (stats.failed_attempts || 0) + 1;
+    if (stats.failed_attempts >= 3) {
+      stats.failed_attempts = 0;
+      stats.locked_until = Date.now() + 60000; // 60 seconds
+      const newScore = Math.max(0, user.score - 1); // Deduct 1 point
+      await supabase.from('users').update({ score: newScore, stats }).eq('id', userId);
+      return NextResponse.json({ error: '¿Estás queriendo hacer trampa? -1 punto y 60 segundos de penalización.' }, { status: 429 });
+    } else {
+      await supabase.from('users').update({ stats }).eq('id', userId);
+      return NextResponse.json({ error: `Ese código no existe o está mal escrito... (Intento fallido ${stats.failed_attempts}/3)` }, { status: 400 });
+    }
+  }
+
+  // Reset failed attempts on success
+  stats.failed_attempts = 0;
 
   const codeObj = codes[0];
 
@@ -58,7 +77,6 @@ export async function POST(req: Request) {
 
   // 6. Actualizar puntaje y trofeos del usuario
   const newScore = user.score + pointsToAward;
-  let stats = user.stats || {};
   let trophies = user.trophies || [];
 
   if (isFirst) {

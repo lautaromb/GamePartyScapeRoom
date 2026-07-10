@@ -41,7 +41,7 @@ export default function Tablero() {
   const [toast, setToast] = useState<{text: string, type: 'success'|'error'|'info'} | null>(null);
   const showToast = (text: string, type: 'success'|'error'|'info' = 'info') => {
     setToast({ text, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), type === 'info' ? 8000 : 4000);
   };
 
   // 8-bit Sound Effects
@@ -345,23 +345,21 @@ export default function Tablero() {
            confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 }, zIndex: 9999 });
            playSfx('win');
         }
+      } else if (res.status === 429) {
+        setIsShaking(true);
+        playSfx('error');
+        setTimeout(() => setIsShaking(false), 500);
+        const newLock = Date.now() + 60000;
+        localStorage.setItem('lockUntil', newLock.toString());
+        setLockUntil(newLock);
+        setLockSecondsLeft(60);
+        setMsg({ text: data.error, type: 'error' });
+        fetchData(); // Actualizar puntaje (-1)
       } else {
         setIsShaking(true);
         playSfx('error');
         setTimeout(() => setIsShaking(false), 500);
-
-        let fails = parseInt(localStorage.getItem('fails') || '0') + 1;
-        if (fails >= 3) {
-          const newLock = Date.now() + 30000;
-          localStorage.setItem('lockUntil', newLock.toString());
-          localStorage.setItem('fails', '0');
-          setLockUntil(newLock);
-          setLockSecondsLeft(30);
-          setMsg({ text: '¡Demasiados errores! Has sido congelado por 30 segundos.', type: 'error' });
-        } else {
-          localStorage.setItem('fails', fails.toString());
-          setMsg({ text: data.error, type: 'error' });
-        }
+        setMsg({ text: data.error, type: 'error' });
       }
     } catch (e) {
       setMsg({ text: 'Error de conexión', type: 'error' });
@@ -378,7 +376,7 @@ export default function Tablero() {
       {toast && (
         <div style={{
           position: 'fixed',
-          top: '20px',
+          bottom: '90px',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 9999,
@@ -563,6 +561,13 @@ export default function Tablero() {
                 </div>
               </div>
             )}
+            {winners.length === 0 && me?.score >= 30 && (
+              <div style={{background: 'rgba(255, 179, 0, 0.2)', color: 'var(--accent-primary)', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', border: '2px solid var(--accent-primary)', fontWeight: 'bold', fontSize: '1.2rem', animation: 'pulse 2s infinite', boxShadow: '0 0 20px rgba(255,179,0,0.4)'}}>
+                <span style={{fontSize: '2rem'}}>🏁</span><br/>
+                ¡CRUZASTE LA META!<br/>
+                <span style={{fontSize: '1rem', color: '#fff', fontWeight: 'normal'}}>Ya estás en el podio. Esperando a que lleguen los demás competidores para revelar los puestos...</span>
+              </div>
+            )}
 
         {isLocked && (
           <div style={{background: 'rgba(255, 0, 0, 0.2)', border: '2px solid red', color: '#ff6b6b', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.2rem', animation: 'shake 0.5s'}}>
@@ -666,6 +671,21 @@ export default function Tablero() {
         {activeTab === 'ranking' && (
           <div>
              <h2 className="spooky-title" style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>Posiciones</h2>
+             
+             {users.length > 0 && (
+               <div style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', height: '50px', borderRadius: '25px', marginBottom: '2rem', border: '2px solid var(--accent-primary)', overflow: 'hidden', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)' }}>
+                 <div style={{ position: 'absolute', right: '10px', top: '5px', fontSize: '1.5rem', opacity: 0.5 }}>🏁</div>
+                 {users.slice(0, 3).map((u, i) => {
+                   const percentage = Math.min(100, Math.max(0, (u.score / 30) * 100));
+                   return (
+                     <div key={u.id} style={{ position: 'absolute', left: `calc(${percentage}% - 20px)`, top: '5px', fontSize: '1.8rem', transition: 'left 1s ease-out', zIndex: 3 - i, filter: `drop-shadow(0 0 5px ${i===0?'gold':i===1?'silver':'#cd7f32'})` }} title={`${u.nickname} - ${u.score}pts`}>
+                       {u.avatar}
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
+
              <div className="glass" style={{ padding: '1rem' }}>
               {users.map((u, index) => (
                 <div key={u.id} className={`leaderboard-item ${index === 0 && u.score > 0 ? 'first-place' : ''}`}>
