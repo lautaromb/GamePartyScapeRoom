@@ -47,8 +47,8 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Determinar ganador (si alguien tiene 30 o más puntos)
-  const winner = users.find(u => u.score >= 30)?.nickname || null;
+  // Determinar podio (los que tienen 30 o más puntos)
+  const winners = users.filter(u => u.score >= 30).sort((a,b) => b.score - a.score).map(u => u.nickname);
 
-  return NextResponse.json({ users, winner });
+  return NextResponse.json({ users, winners });
 }

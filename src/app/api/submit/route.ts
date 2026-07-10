@@ -15,9 +15,9 @@ export async function POST(req: Request) {
   const user = users.find(u => u.id === userId);
   if (!user) return NextResponse.json({ error: 'Usuario no encontrado. Vuelve a iniciar sesión.' }, { status: 404 });
 
-  const winner = users.find(u => u.score >= 30);
-  if (winner) {
-    return NextResponse.json({ error: `El juego ya terminó. ¡Ganó ${winner.nickname}!` }, { status: 400 });
+  const winners = users.filter(u => u.score >= 30).sort((a,b) => b.score - a.score);
+  if (winners.length >= 3) {
+    return NextResponse.json({ error: `El juego ya terminó. ¡Ya tenemos nuestro podio de ganadores!` }, { status: 400 });
   }
 
   // 2. Buscar código

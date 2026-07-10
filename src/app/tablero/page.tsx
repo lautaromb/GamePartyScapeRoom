@@ -18,7 +18,7 @@ export default function Tablero() {
   const [activeTab, setActiveTab] = useState('misiones'); 
   const [users, setUsers] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
-  const [winner, setWinner] = useState<string | null>(null);
+  const [winners, setWinners] = useState<string[]>([]);
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
@@ -44,6 +44,44 @@ export default function Tablero() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // 8-bit Sound Effects
+  const playSfx = (type: 'win' | 'blip' | 'error') => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      if (type === 'blip') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.start(); osc.stop(ctx.currentTime + 0.1);
+      } else if (type === 'error') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.start(); osc.stop(ctx.currentTime + 0.3);
+      } else if (type === 'win') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.setValueAtTime(554.37, ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.2);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+        osc.start(); osc.stop(ctx.currentTime + 0.6);
+      }
+    } catch(e) {}
+  };
+
   // Avoid closure issues
   const activeEventRef = useRef(activeEvent);
   activeEventRef.current = activeEvent;
@@ -63,11 +101,12 @@ export default function Tablero() {
       const dataUsers = await resUsers.json();
       setUsers(dataUsers.users);
       
-      setWinner((prevWinner) => {
-        if (dataUsers.winner && !prevWinner) {
-           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, zIndex: 9999 });
+      setWinners((prevWinners) => {
+        if (dataUsers.winners && dataUsers.winners.length > 0 && prevWinners.length !== dataUsers.winners.length) {
+           confetti({ particleCount: 250, spread: 100, origin: { y: 0.5 }, zIndex: 9999 });
+           playSfx('win');
         }
-        return dataUsers.winner;
+        return dataUsers.winners || [];
       });
       
       const myUser = dataUsers.users.find((u: any) => u.id === userId);
@@ -107,6 +146,16 @@ export default function Tablero() {
     }
   };
 
+  // Prevent DDOS from 30 clients fetching at the exact same millisecond
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedFetchData = () => {
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    const jitter = Math.floor(Math.random() * 1500); // 0 to 1.5s delay
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchData();
+    }, 500 + jitter);
+  };
+
   useEffect(() => {
     if (!localStorage.getItem('userId')) {
       router.push('/');
@@ -115,18 +164,26 @@ export default function Tablero() {
     fetchData();
 
     const channel = supabase.channel('realtime-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => debouncedFetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => debouncedFetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
-        fetchData();
-        // If the payload shows the event changed to finished, explicitly fetch results
         const newRecord = payload.new as any;
-        if (newRecord && newRecord.status === 'finished') {
-          if (activeEventRef.current && activeEventRef.current.id === newRecord.id) {
-             setEventDone(true);
-             fetchEventResults(newRecord.id);
-          }
+        if (!newRecord) return;
+        
+        // Instant UI update for events to avoid relying on slow polling
+        if (newRecord.status === 'active' || newRecord.status === 'waiting') {
+           setActiveEvent(newRecord);
+           setEventCategory(null);
+           setHasSubmitted(false);
+           setEventDone(false);
+           setEventResults(null);
+        } else if (newRecord.status === 'finished') {
+           if (activeEventRef.current && activeEventRef.current.id === newRecord.id) {
+              setEventDone(true);
+              fetchEventResults(newRecord.id);
+           }
         }
+        debouncedFetchData();
       })
       .subscribe();
 
@@ -185,7 +242,7 @@ export default function Tablero() {
       const duration = isWaiting ? 20 : 45;
 
       const interval = setInterval(async () => {
-        // 1. Check local timer
+        // 1. Check local timer every second
         const left = Math.ceil(duration - (Date.now() - started) / 1000);
         if (left <= 0) {
           setEventTimeLeft(0);
@@ -199,30 +256,30 @@ export default function Tablero() {
           setEventTimeLeft(left);
         }
         
-        // 2. Poll status to see if Admin finished it early or launched it
-        try {
-          const res = await fetch(`/api/events?t=${Date.now()}`);
-          const data = await res.json();
-          if (data.event) {
-            // Si estaba en waiting y ahora esta active, actualizamos para iniciar la trivia
-            if (isWaiting && data.event.status === 'active') {
-              setActiveEvent(data.event);
+        // 2. Failsafe Poll solo cada 10 segs
+        if (left % 10 === 0 && left > 0 && left < duration) {
+          try {
+            const res = await fetch(`/api/events?t=${Date.now()}`);
+            const data = await res.json();
+            if (data.event) {
+              if (isWaiting && data.event.status === 'active') {
+                setActiveEvent(data.event);
+                clearInterval(interval);
+              }
+            } else {
+              setEventTimeLeft(0);
+              if (!isWaiting) {
+                setEventDone(true);
+                fetchEventResults(activeEvent.id);
+                fetchData();
+              } else {
+                setActiveEvent(null);
+              }
               clearInterval(interval);
             }
-          } else {
-            // Si el evento ya no está activo ni waiting, el admin lo cerró temprano
-            setEventTimeLeft(0);
-            if (!isWaiting) {
-              setEventDone(true);
-              fetchEventResults(activeEvent.id);
-              fetchData();
-            } else {
-              setActiveEvent(null);
-            }
-            clearInterval(interval);
-          }
-        } catch (e) {}
-      }, 2000); // Polling rapido para transiciones fluidas
+          } catch (e) {}
+        }
+      }, 1000); // 1 segundo para el reloj local
       return () => clearInterval(interval);
     }
   }, [activeEvent, eventDone]);
@@ -250,10 +307,13 @@ export default function Tablero() {
     // Alerta personalizada en vez de nativa
     if (data.isCorrect) {
       showToast('¡Respuesta enviada!', 'success');
+      playSfx('blip');
     } else if (res.ok) {
       showToast('¡Respuesta enviada!', 'info');
+      playSfx('blip');
     } else {
       showToast(data.error || 'Error al enviar', 'error');
+      playSfx('error');
     }
   };
 
@@ -278,13 +338,16 @@ export default function Tablero() {
       if (res.ok) {
         setMsg({ text: data.message, type: 'success' });
         setCode('');
+        playSfx('blip');
         localStorage.setItem('fails', '0');
         fetchData();
         if (data.isWinner) {
            confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 }, zIndex: 9999 });
+           playSfx('win');
         }
       } else {
         setIsShaking(true);
+        playSfx('error');
         setTimeout(() => setIsShaking(false), 500);
 
         let fails = parseInt(localStorage.getItem('fails') || '0') + 1;
@@ -489,9 +552,16 @@ export default function Tablero() {
         // NORMAL GAME UI
         <>
           <main className="container">
-            {winner && (
+            {winners.length > 0 && (
               <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
-                🥁 ¡mis 30 - Lautaro! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
+                <img src="/cake_30.jpg" alt="Cake 30" style={{width: '120px', margin: '0 auto 10px auto', display: 'block', borderRadius: '15px'}} />
+                🥁 ¡mis 30 - Lautaro! 🥁<br/><br/>
+                <span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>
+                  ¡El podio está formado!<br/>
+                  🥇 {winners[0]}<br/>
+                  {winners[1] && `🥈 ${winners[1]}`}<br/>
+                  {winners[2] && `🥉 ${winners[2]}`}
+                </span>
               </div>
             )}
 
