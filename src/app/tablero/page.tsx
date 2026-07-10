@@ -103,10 +103,11 @@ export default function Tablero() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
         fetchData();
         // If the payload shows the event changed to finished, explicitly fetch results
-        if (payload.new && payload.new.status === 'finished') {
-          if (activeEventRef.current && activeEventRef.current.id === payload.new.id) {
+        const newRecord = payload.new as any;
+        if (newRecord && newRecord.status === 'finished') {
+          if (activeEventRef.current && activeEventRef.current.id === newRecord.id) {
              setEventDone(true);
-             fetchEventResults(payload.new.id);
+             fetchEventResults(newRecord.id);
           }
         }
       })
