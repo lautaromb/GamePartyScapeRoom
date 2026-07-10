@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Scroll, ScanLine, Trophy, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/db';
@@ -28,11 +28,22 @@ export default function Tablero() {
   const [eventDone, setEventDone] = useState(false);
   const [eventResults, setEventResults] = useState<any>(null);
 
+  // Avoid closure issues
+  const activeEventRef = useRef(activeEvent);
+  activeEventRef.current = activeEvent;
+  const eventDoneRef = useRef(eventDone);
+  eventDoneRef.current = eventDone;
+
   const fetchData = async () => {
     try {
       const userId = localStorage.getItem('userId');
+      if (!userId) {
+        router.push('/');
+        return;
+      }
       
-      const resUsers = await fetch('/api/users');
+      const ts = Date.now();
+      const resUsers = await fetch(`/api/users?t=${ts}`);
       const dataUsers = await resUsers.json();
       setUsers(dataUsers.users);
       
@@ -46,27 +57,32 @@ export default function Tablero() {
       const myUser = dataUsers.users.find((u: any) => u.id === userId);
       if (myUser) {
         setMe(myUser);
-      } else if (userId) {
+      } else {
         localStorage.removeItem('userId');
         router.push('/');
+        return;
       }
 
-      const resMissions = await fetch(`/api/missions?userId=${userId}`);
+      const resMissions = await fetch(`/api/missions?userId=${userId}&t=${ts}`);
       const dataMissions = await resMissions.json();
       setMissions(dataMissions.missions);
 
       // Fetch active event
-      const resEv = await fetch('/api/events');
+      const resEv = await fetch(`/api/events?t=${ts}`);
       const dataEv = await resEv.json();
+      
       if (dataEv.event) {
-        if (!activeEvent || activeEvent.id !== dataEv.event.id) {
+        if (!activeEventRef.current || activeEventRef.current.id !== dataEv.event.id) {
           setActiveEvent(dataEv.event);
           setEventCategory(null);
           setEventDone(false);
           setEventResults(null);
         }
       } else {
-        setActiveEvent(null);
+        // If there is no active event, but we were showing results, keep showing them until user closes
+        if (!eventDoneRef.current) {
+          setActiveEvent(null);
+        }
       }
 
     } catch (e) {
@@ -84,10 +100,15 @@ export default function Tablero() {
     const channel = supabase.channel('realtime-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
         fetchData();
-        // If an event finished, fetch results
-        if(activeEvent) fetchEventResults(activeEvent.id);
+        // If the payload shows the event changed to finished, explicitly fetch results
+        if (payload.new && payload.new.status === 'finished') {
+          if (activeEventRef.current && activeEventRef.current.id === payload.new.id) {
+             setEventDone(true);
+             fetchEventResults(payload.new.id);
+          }
+        }
       })
       .subscribe();
 
@@ -97,7 +118,7 @@ export default function Tablero() {
     }
 
     return () => { supabase.removeChannel(channel); };
-  }, [router, activeEvent]);
+  }, [router]); // Eliminated activeEvent from dependencies so it doesn't reconnect constantly
 
   useEffect(() => {
     if (lockUntil && lockUntil > Date.now()) {
@@ -137,7 +158,7 @@ export default function Tablero() {
   }, [activeEvent, eventDone]);
 
   const fetchEventResults = async (eventId: string) => {
-    const res = await fetch(`/api/events/finish?eventId=${eventId}`);
+    const res = await fetch(`/api/events/finish?eventId=${eventId}&t=${Date.now()}`);
     if (res.ok) {
       const data = await res.json();
       setEventResults(data.answers);
@@ -155,6 +176,8 @@ export default function Tablero() {
     const data = await res.json();
     setEventDone(true);
     setLoading(false);
+    
+    // Alerta temporal, igual ahora verán los resultados en vivo.
     if (data.isCorrect) {
       alert('¡Respuesta enviada! Es correcta. Espera los resultados.');
     } else if (res.ok) {
@@ -218,9 +241,9 @@ export default function Tablero() {
   const isLocked = lockUntil !== null && lockSecondsLeft > 0;
 
   // EVENT OVERLAY UI
-  if (activeEvent && activeEvent.status !== 'idle') {
+  if (activeEvent) {
     return (
-      <main className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', background: '#0a0a0a' }}>
+      <main className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', background: '#0a0a0a', zIndex: 100, position: 'relative' }}>
         <h1 className="spooky-title" style={{ fontSize: '2.5rem', animation: 'pulse 1.5s infinite' }}>🚨 EVENTO GLOBAL 🚨</h1>
         
         {!eventDone ? (
@@ -250,13 +273,8 @@ export default function Tablero() {
                   {(() => {
                     const qData = activeEvent.questions?.[eventCategory];
                     if (!qData) return null;
-                    
-                    // Solo mezclamos una vez usando una semilla simple o simplemente al renderizar (idealmente deberia estar en un useEffect pero para este minijuego un sort rapido sirve, aunque react puede re-renderizar y cambiar el orden, asi que usemos el eventCategory string length + options como semilla falsa)
-                    // Mejor lo hacemos en un array determinista basado en el ID de evento para que no parpadee:
                     const options = [qData.correct, ...qData.wrong];
-                    // Un shuffle simple que no cambia por re-render (determinista)
                     options.sort((a, b) => (a.length - b.length) > 0 ? 1 : -1);
-                    // Como el sort por length puede ser predecible, metemos una rotación básica
                     const rotated = [...options.slice(1), options[0]];
 
                     return rotated.map((opt, i) => (
@@ -279,19 +297,19 @@ export default function Tablero() {
             )}
           </>
         ) : (
-          <div className="glass" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+          <div className="glass" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <h2 style={{ textAlign: 'center', color: 'var(--accent-primary)', marginBottom: '1rem' }}>¡TIEMPO AGOTADO!</h2>
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Esperando que el Guardián finalice el evento para ver los resultados...</p>
             
-            {eventResults && (
-              <div style={{ marginTop: '2rem' }}>
-                <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Resultados Oficiales (Correctas)</h3>
+            {!eventResults ? (
+               <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Calculando resultados oficiales...</p>
+            ) : (
+              <div style={{ marginTop: '1rem' }}>
+                <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Resultados Oficiales</h3>
                 
                 {['music', 'movies', 'sports', 'general'].map(cat => {
-                  const ans = eventResults.filter((a: any) => a.category === cat);
+                  const ans = eventResults.filter((a: any) => a.category === cat && a.is_correct);
                   if (ans.length === 0) return null;
                   
-                  // sort to find winner
                   ans.sort((a:any, b:any) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime());
                   const firstTime = new Date(ans[0].answered_at).getTime();
 
@@ -314,6 +332,10 @@ export default function Tablero() {
                 })}
               </div>
             )}
+            
+            <button className="btn-slime" style={{ marginTop: 'auto' }} onClick={() => setActiveEvent(null)}>
+              CERRAR Y VOLVER AL TABLERO
+            </button>
           </div>
         )}
       </main>
