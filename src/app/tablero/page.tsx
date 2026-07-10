@@ -160,21 +160,37 @@ export default function Tablero() {
     setLoading(false);
   };
 
-  // Event Timer
+  // Event Timer y Auto-Refresh
   useEffect(() => {
-    if (activeEvent && activeEvent.status === 'active' && !eventDone) {
+    if (activeEvent && !eventDone) {
       const started = new Date(activeEvent.started_at).getTime();
-      const interval = setInterval(() => {
+      const interval = setInterval(async () => {
+        // 1. Check local timer
         const left = Math.ceil(45 - (Date.now() - started) / 1000);
         if (left <= 0) {
           setEventTimeLeft(0);
           setEventDone(true);
           fetchEventResults(activeEvent.id);
+          fetchData(); // Actualizar ranking
           clearInterval(interval);
         } else {
           setEventTimeLeft(left);
         }
-      }, 1000);
+        
+        // 2. Poll status to see if Admin finished it early
+        try {
+          const res = await fetch(`/api/events?t=${Date.now()}`);
+          const data = await res.json();
+          // Si el evento ya no está activo, el admin lo cerró temprano
+          if (!data.event) {
+            setEventTimeLeft(0);
+            setEventDone(true);
+            fetchEventResults(activeEvent.id);
+            fetchData();
+            clearInterval(interval);
+          }
+        } catch (e) {}
+      }, 5000); // Polling cada 5 segs para mayor ahorro
       return () => clearInterval(interval);
     }
   }, [activeEvent, eventDone]);
@@ -326,36 +342,80 @@ export default function Tablero() {
                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Calculando resultados oficiales...</p>
             ) : (
               <div style={{ marginTop: '1rem' }}>
-                <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Resultados Oficiales</h3>
+                <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem', textAlign: 'center' }}>📊 Estadísticas de la Ronda</h3>
                 
                 {['music', 'movies', 'sports', 'general'].map(cat => {
-                  const ans = eventResults.filter((a: any) => a.category === cat && a.is_correct);
-                  if (ans.length === 0) return null;
+                  const catAnswers = eventResults.filter((a: any) => a.category === cat);
+                  if (catAnswers.length === 0) return null;
                   
-                  ans.sort((a:any, b:any) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime());
-                  const firstTime = new Date(ans[0].answered_at).getTime();
+                  const correctAnswers = catAnswers.filter((a: any) => a.is_correct).sort((a:any, b:any) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime());
+                  const firstTime = correctAnswers.length > 0 ? new Date(correctAnswers[0].answered_at).getTime() : 0;
+                  
+                  // Contar votos por respuesta
+                  const votes: Record<string, number> = {};
+                  let maxVotes = 0;
+                  catAnswers.forEach((a: any) => {
+                    votes[a.answer] = (votes[a.answer] || 0) + 1;
+                    if (votes[a.answer] > maxVotes) maxVotes = votes[a.answer];
+                  });
+
+                  const catIcons: any = { music: '🎵 Música', movies: '🎬 Cine', sports: '⚽ Deportes', general: '🌎 Cultura' };
 
                   return (
-                    <div key={cat} style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px' }}>
-                      <strong style={{ textTransform: 'uppercase', color: 'var(--accent-secondary)' }}>{cat}</strong>
-                      <div style={{ marginTop: '0.5rem' }}>
-                        {ans.map((a: any) => {
-                          const isWinner = Math.abs(new Date(a.answered_at).getTime() - firstTime) < 1000;
+                    <div key={cat} style={{ marginBottom: '2rem', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <strong style={{ display: 'block', textTransform: 'uppercase', color: 'var(--accent-secondary)', fontSize: '1.2rem', marginBottom: '1rem', textAlign: 'center' }}>
+                        {catIcons[cat]}
+                      </strong>
+                      
+                      {/* BAR CHART */}
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        {Object.entries(votes).sort((a,b) => b[1] - a[1]).map(([ansText, count], idx) => {
+                          const percentage = Math.round((count / catAnswers.length) * 100);
+                          const isCorrect = correctAnswers.some((c:any) => c.answer === ansText);
+                          
                           return (
-                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                              <span>{isWinner ? '👑' : '✅'} {a.users?.nickname || 'Jugador'}</span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(a.answered_at).toLocaleTimeString()}</span>
+                            <div key={idx} style={{ marginBottom: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '4px' }}>
+                                <span>{ansText} {isCorrect ? '✅' : '❌'}</span>
+                                <span>{percentage}% ({count})</span>
+                              </div>
+                              <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                  width: `${percentage}%`, 
+                                  height: '100%', 
+                                  background: isCorrect ? 'var(--accent-primary)' : '#ff6b6b',
+                                  transition: 'width 1s ease-out' 
+                                }} />
+                              </div>
                             </div>
-                          )
+                          );
                         })}
                       </div>
+
+                      {/* WINNERS */}
+                      {correctAnswers.length > 0 && (
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Acertaron:</div>
+                          {correctAnswers.map((a: any) => {
+                            const isWinner = Math.abs(new Date(a.answered_at).getTime() - firstTime) < 1000;
+                            return (
+                              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <span style={{ color: isWinner ? 'var(--accent-secondary)' : '#fff', fontWeight: isWinner ? 'bold' : 'normal' }}>
+                                  {isWinner ? '👑' : '👏'} {a.users?.nickname || 'Jugador'}
+                                </span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(a.answered_at).toLocaleTimeString()}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
             )}
             
-            <button className="btn-slime" style={{ marginTop: 'auto' }} onClick={() => setActiveEvent(null)}>
+            <button className="btn-slime" style={{ marginTop: 'auto' }} onClick={() => { setActiveEvent(null); fetchData(); }}>
               CERRAR Y VOLVER AL TABLERO
             </button>
           </div>
