@@ -60,6 +60,11 @@ export async function POST(req: Request) {
 
             if (user.score + pts >= 30 && user.score < 30) {
               stats.win_time = Date.now();
+              const { data: currentUsers } = await supabase.from('users').select('score');
+              const alreadyFinished = currentUsers?.filter(u => u.score >= 30).length || 0;
+              if (alreadyFinished === 0 && !trophies.includes('Oro')) trophies.push('Oro');
+              else if (alreadyFinished === 1 && !trophies.includes('Plata')) trophies.push('Plata');
+              else if (alreadyFinished === 2 && !trophies.includes('Bronce')) trophies.push('Bronce');
             }
 
             await supabase.from('users').update({ score: user.score + pts, stats, trophies }).eq('id', ans.user_id);

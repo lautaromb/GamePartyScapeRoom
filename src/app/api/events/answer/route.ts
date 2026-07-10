@@ -11,6 +11,12 @@ export async function POST(req: Request) {
   if (eventErr || !event) return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
   if (event.status !== 'active') return NextResponse.json({ error: 'Evento cerrado' }, { status: 400 });
 
+  // 1.5. Comprobar si el usuario está congelado
+  const { data: user } = await supabase.from('users').select('stats').eq('id', userId).single();
+  if (user?.stats?.locked_until && Date.now() < user.stats.locked_until) {
+    return NextResponse.json({ error: 'Estás congelado. No puedes participar en esta trivia.' }, { status: 429 });
+  }
+
   // 2. Comprobar si ya respondió
   const { data: existing } = await supabase.from('event_answers').select('*').eq('event_id', eventId).eq('user_id', userId).single();
   if (existing) return NextResponse.json({ error: 'Ya respondiste este evento' }, { status: 400 });

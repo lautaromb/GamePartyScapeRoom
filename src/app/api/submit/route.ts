@@ -88,6 +88,10 @@ export async function POST(req: Request) {
 
   if (newScore >= 30 && user.score < 30) {
     stats.win_time = Date.now();
+    const alreadyFinished = users.filter(u => u.score >= 30).length;
+    if (alreadyFinished === 0 && !trophies.includes('Oro')) trophies.push('Oro');
+    else if (alreadyFinished === 1 && !trophies.includes('Plata')) trophies.push('Plata');
+    else if (alreadyFinished === 2 && !trophies.includes('Bronce')) trophies.push('Bronce');
   }
 
   const { error: updateUserError } = await supabase

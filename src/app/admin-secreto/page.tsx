@@ -120,6 +120,11 @@ export default function AdminSecreto() {
       body: JSON.stringify({ adminPassword: password, id, status: 'active' })
     });
     fetchEvents();
+    
+    // Automatizar el finalizado a los 45 segundos
+    setTimeout(() => {
+      handleFinishEvent(id);
+    }, 45000);
   };
 
   const handleOpenWaitingRoom = async (id: string) => {
@@ -129,6 +134,11 @@ export default function AdminSecreto() {
       body: JSON.stringify({ adminPassword: password, id, status: 'waiting' })
     });
     fetchEvents();
+    
+    // Automatizar el lanzamiento a los 20 segundos
+    setTimeout(() => {
+      handleLaunchEvent(id);
+    }, 20000);
   };
 
   const handleFinishEvent = async (id: string) => {
@@ -138,7 +148,7 @@ export default function AdminSecreto() {
       body: JSON.stringify({ adminPassword: password, eventId: id })
     });
     if (res.ok) {
-      alert('Evento Finalizado y Puntos Repartidos');
+      alert('Evento Finalizado y Puntos Repartidos Automáticamente');
       fetchEvents();
     }
   };

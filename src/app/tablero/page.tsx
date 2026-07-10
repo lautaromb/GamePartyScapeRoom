@@ -6,9 +6,12 @@ import { supabase } from '@/lib/db';
 import confetti from 'canvas-confetti';
 
 const TROPHIES_DATA: Record<string, {emoji: string, desc: string}> = {
+  'Oro': {emoji: '🏆', desc: '¡Primer puesto general!'},
+  'Plata': {emoji: '🥈', desc: '¡Segundo puesto general!'},
+  'Bronce': {emoji: '🥉', desc: '¡Tercer puesto general!'},
   'Cerebrito': {emoji: '🧠', desc: '5 preguntas correctas al hilo'},
   'Sabueso': {emoji: '🐕', desc: 'Encontraste 3 pistas antes que todos'},
-  'Francia': {emoji: '🥈', desc: 'Segundo lugar en rapidez 3 veces seguidas'},
+  'Francia': {emoji: '🇫🇷', desc: 'Segundo lugar en rapidez 3 veces seguidas'},
   'Pepe Argento': {emoji: '⚽', desc: 'Respondiste bien 3 preguntas sobre deportes'},
   'Pistolero': {emoji: '🔫', desc: 'Respondiste primero 3 veces seguidas'}
 };
@@ -420,6 +423,11 @@ export default function Tablero() {
                   <button className="btn-slime" style={{ background: '#a855f7' }} onClick={() => setEventCategory('general')}>🌎 Conocimiento</button>
                 </div>
               </div>
+            ) : isLocked ? (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(255,0,0,0.2)', border: '2px solid red' }}>
+                <h3 style={{color: '#ff6b6b', marginBottom: '1rem', fontSize: '1.5rem'}}>¡ESTÁS CONGELADO!</h3>
+                <p style={{color: '#fff', fontSize: '1.1rem', textAlign: 'center'}}>No puedes participar en esta trivia. Espera {lockSecondsLeft} segundos.</p>
+              </div>
             ) : hasSubmitted ? (
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                 <h3 style={{color: 'var(--accent-primary)', marginBottom: '1rem', fontSize: '1.5rem'}}>¡Respuesta enviada!</h3>
@@ -673,12 +681,14 @@ export default function Tablero() {
              <h2 className="spooky-title" style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>Posiciones</h2>
              
              {users.length > 0 && (
-               <div style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', height: '50px', borderRadius: '25px', marginBottom: '2rem', border: '2px solid var(--accent-primary)', overflow: 'hidden', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)' }}>
-                 <div style={{ position: 'absolute', right: '10px', top: '5px', fontSize: '1.5rem', opacity: 0.5 }}>🏁</div>
+               <div style={{ position: 'relative', background: 'linear-gradient(90deg, #1a1a1a 0%, #333 100%)', height: '60px', borderRadius: '30px', marginBottom: '2rem', border: '3px solid #ff00ff', overflow: 'hidden', boxShadow: '0 0 15px rgba(255,0,255,0.5), inset 0 0 20px rgba(0,0,0,1)' }}>
+                 {/* Dashed line */}
+                 <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '2px', borderTop: '2px dashed rgba(255,255,255,0.2)', transform: 'translateY(-50%)' }}></div>
+                 <div style={{ position: 'absolute', right: '10px', top: '10px', fontSize: '1.8rem', opacity: 0.8, filter: 'drop-shadow(0 0 5px #fff)' }}>🏁</div>
                  {users.slice(0, 3).map((u, i) => {
                    const percentage = Math.min(100, Math.max(0, (u.score / 30) * 100));
                    return (
-                     <div key={u.id} style={{ position: 'absolute', left: `calc(${percentage}% - 20px)`, top: '5px', fontSize: '1.8rem', transition: 'left 1s ease-out', zIndex: 3 - i, filter: `drop-shadow(0 0 5px ${i===0?'gold':i===1?'silver':'#cd7f32'})` }} title={`${u.nickname} - ${u.score}pts`}>
+                     <div key={u.id} style={{ position: 'absolute', left: `calc(${percentage}% - 25px)`, top: '10px', fontSize: '1.8rem', transition: 'left 1s cubic-bezier(0.34, 1.56, 0.64, 1)', zIndex: 3 - i, filter: `drop-shadow(0 0 8px ${i===0?'gold':i===1?'silver':'#cd7f32'})` }} title={`${u.nickname} - ${u.score}pts`}>
                        {u.avatar}
                      </div>
                    );
