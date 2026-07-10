@@ -167,33 +167,48 @@ export default function Tablero() {
   useEffect(() => {
     if (activeEvent && !eventDone) {
       const started = new Date(activeEvent.started_at).getTime();
+      const isWaiting = activeEvent.status === 'waiting';
+      const duration = isWaiting ? 20 : 45;
+
       const interval = setInterval(async () => {
         // 1. Check local timer
-        const left = Math.ceil(45 - (Date.now() - started) / 1000);
+        const left = Math.ceil(duration - (Date.now() - started) / 1000);
         if (left <= 0) {
           setEventTimeLeft(0);
-          setEventDone(true);
-          fetchEventResults(activeEvent.id);
-          fetchData(); // Actualizar ranking
-          clearInterval(interval);
+          if (!isWaiting) {
+            setEventDone(true);
+            fetchEventResults(activeEvent.id);
+            fetchData(); // Actualizar ranking
+            clearInterval(interval);
+          }
         } else {
           setEventTimeLeft(left);
         }
         
-        // 2. Poll status to see if Admin finished it early
+        // 2. Poll status to see if Admin finished it early or launched it
         try {
           const res = await fetch(`/api/events?t=${Date.now()}`);
           const data = await res.json();
-          // Si el evento ya no está activo, el admin lo cerró temprano
-          if (!data.event) {
+          if (data.event) {
+            // Si estaba en waiting y ahora esta active, actualizamos para iniciar la trivia
+            if (isWaiting && data.event.status === 'active') {
+              setActiveEvent(data.event);
+              clearInterval(interval);
+            }
+          } else {
+            // Si el evento ya no está activo ni waiting, el admin lo cerró temprano
             setEventTimeLeft(0);
-            setEventDone(true);
-            fetchEventResults(activeEvent.id);
-            fetchData();
+            if (!isWaiting) {
+              setEventDone(true);
+              fetchEventResults(activeEvent.id);
+              fetchData();
+            } else {
+              setActiveEvent(null);
+            }
             clearInterval(interval);
           }
         } catch (e) {}
-      }, 5000); // Polling cada 5 segs para mayor ahorro
+      }, 2000); // Polling rapido para transiciones fluidas
       return () => clearInterval(interval);
     }
   }, [activeEvent, eventDone]);
@@ -293,7 +308,12 @@ export default function Tablero() {
               00:{eventTimeLeft.toString().padStart(2, '0')}
             </div>
 
-            {!eventCategory ? (
+            {activeEvent.status === 'waiting' ? (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                <h3 style={{color: 'var(--accent-secondary)', marginBottom: '1rem', fontSize: '1.8rem', textAlign: 'center'}}>⏳ Sala de Espera</h3>
+                <p style={{color: '#fff', fontSize: '1.1rem', textAlign: 'center'}}>Esperando a que los demás se unan... ¡La trivia está por comenzar!</p>
+              </div>
+            ) : !eventCategory ? (
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#fff' }}>Elige tu categoría (¡Rápido!)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>

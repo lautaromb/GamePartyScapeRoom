@@ -7,7 +7,9 @@ export async function GET(req: Request) {
   const { data, error } = await supabase
     .from('events')
     .select('*')
-    .eq('status', 'active')
+    .in('status', ['active', 'waiting'])
+    .order('started_at', { ascending: false })
+    .limit(1)
     .single();
     
   if (error && error.code !== 'PGRST116') return NextResponse.json({ error: error.message }, { status: 500 });
@@ -34,7 +36,7 @@ export async function PATCH(req: Request) {
   if (body.adminPassword !== 'misterio90') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
   const updateData: any = { status: body.status };
-  if (body.status === 'active') {
+  if (body.status === 'active' || body.status === 'waiting') {
     updateData.started_at = new Date().toISOString();
   }
   

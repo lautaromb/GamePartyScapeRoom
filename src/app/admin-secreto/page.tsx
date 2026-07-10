@@ -114,15 +114,21 @@ export default function AdminSecreto() {
   };
 
   const handleLaunchEvent = async (id: string) => {
-    const res = await fetch('/api/events', {
+    await fetch('/api/events', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminPassword: password, id, status: 'active' })
     });
-    if (res.ok) {
-      alert('¡Evento Lanzado!');
-      fetchEvents();
-    }
+    fetchData();
+  };
+
+  const handleOpenWaitingRoom = async (id: string) => {
+    await fetch('/api/events', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: password, id, status: 'waiting' })
+    });
+    fetchData();
   };
 
   const handleFinishEvent = async (id: string) => {
@@ -206,7 +212,10 @@ export default function AdminSecreto() {
                   </div>
                   
                   {e.status === 'idle' && (
-                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%'}} onClick={() => handleLaunchEvent(e.id)}>LANZAR AHORA</button>
+                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%', background: '#3b82f6'}} onClick={() => handleOpenWaitingRoom(e.id)}>1. ABRIR SALA DE ESPERA (20s)</button>
+                  )}
+                  {e.status === 'waiting' && (
+                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%', background: '#ff6b6b'}} onClick={() => handleLaunchEvent(e.id)}>2. LANZAR TRIVIA AHORA</button>
                   )}
                   {e.status === 'active' && (
                     <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%', background: 'var(--accent-secondary)'}} onClick={() => handleFinishEvent(e.id)}>FINALIZAR Y REPARTIR PUNTOS</button>
