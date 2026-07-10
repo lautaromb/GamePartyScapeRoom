@@ -24,6 +24,7 @@ export default function Tablero() {
   const [activeEvent, setActiveEvent] = useState<any>(null);
   const [eventCategory, setEventCategory] = useState<string | null>(null);
   const [eventAnswer, setEventAnswer] = useState('');
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [eventTimeLeft, setEventTimeLeft] = useState(45);
   const [eventDone, setEventDone] = useState(false);
   const [eventResults, setEventResults] = useState<any>(null);
@@ -75,6 +76,7 @@ export default function Tablero() {
         if (!activeEventRef.current || activeEventRef.current.id !== dataEv.event.id) {
           setActiveEvent(dataEv.event);
           setEventCategory(null);
+          setHasSubmitted(false);
           setEventDone(false);
           setEventResults(null);
         }
@@ -149,6 +151,7 @@ export default function Tablero() {
       if (dataEv.event) {
         setActiveEvent(dataEv.event);
         setEventCategory(null);
+        setHasSubmitted(false);
         setEventDone(false);
         setEventResults(null);
       } else {
@@ -212,7 +215,7 @@ export default function Tablero() {
       body: JSON.stringify({ eventId: activeEvent.id, userId: me.id, category: eventCategory, answer: eventAnswer })
     });
     const data = await res.json();
-    setEventDone(true);
+    setHasSubmitted(true);
     setLoading(false);
     
     // Alerta temporal, igual ahora verán los resultados en vivo.
@@ -299,6 +302,11 @@ export default function Tablero() {
                   <button className="btn-slime" style={{ background: '#22c55e' }} onClick={() => setEventCategory('sports')}>⚽ Deportes</button>
                   <button className="btn-slime" style={{ background: '#a855f7' }} onClick={() => setEventCategory('general')}>🌎 Conocimiento</button>
                 </div>
+              </div>
+            ) : hasSubmitted ? (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                <h3 style={{color: 'var(--accent-primary)', marginBottom: '1rem', fontSize: '1.5rem'}}>¡Respuesta enviada!</h3>
+                <p style={{color: '#fff', fontSize: '1.1rem', textAlign: 'center'}}>Esperando a que termine el tiempo y voten los demás...</p>
               </div>
             ) : (
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
