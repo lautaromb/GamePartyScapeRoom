@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { premadeEvents } from '@/data/premadeEvents';
 
 export default function AdminSecreto() {
@@ -113,7 +113,12 @@ export default function AdminSecreto() {
     }
   };
 
+  const waitingTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+  const activeTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
   const handleLaunchEvent = async (id: string) => {
+    if (waitingTimeouts.current[id]) clearTimeout(waitingTimeouts.current[id]);
+
     await fetch('/api/events', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -122,12 +127,15 @@ export default function AdminSecreto() {
     fetchEvents();
     
     // Automatizar el finalizado a los 45 segundos
-    setTimeout(() => {
+    if (activeTimeouts.current[id]) clearTimeout(activeTimeouts.current[id]);
+    activeTimeouts.current[id] = setTimeout(() => {
       handleFinishEvent(id);
     }, 45000);
   };
 
   const handleOpenWaitingRoom = async (id: string) => {
+    if (waitingTimeouts.current[id]) clearTimeout(waitingTimeouts.current[id]);
+
     await fetch('/api/events', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -136,12 +144,13 @@ export default function AdminSecreto() {
     fetchEvents();
     
     // Automatizar el lanzamiento a los 20 segundos
-    setTimeout(() => {
+    waitingTimeouts.current[id] = setTimeout(() => {
       handleLaunchEvent(id);
     }, 20000);
   };
 
   const handleFinishEvent = async (id: string) => {
+    if (activeTimeouts.current[id]) clearTimeout(activeTimeouts.current[id]);
     const res = await fetch('/api/events/finish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
