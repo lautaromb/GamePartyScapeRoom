@@ -58,6 +58,10 @@ export async function POST(req: Request) {
               stats.second_place_streak = 0;
             }
 
+            if (user.score + pts >= 30 && user.score < 30) {
+              stats.win_time = Date.now();
+            }
+
             await supabase.from('users').update({ score: user.score + pts, stats, trophies }).eq('id', ans.user_id);
           }
         }

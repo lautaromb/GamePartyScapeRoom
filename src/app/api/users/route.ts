@@ -47,8 +47,19 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Determinar podio (los que tienen 30 o más puntos)
-  const winners = users.filter(u => u.score >= 30).sort((a,b) => b.score - a.score).map(u => u.nickname);
+  // Determinar podio (los primeros 3 en llegar a 30 puntos)
+  let winners: string[] = [];
+  const finishedUsers = users.filter(u => u.score >= 30);
+  if (finishedUsers.length >= 3) {
+    winners = finishedUsers
+      .sort((a,b) => {
+        const timeA = (a.stats && a.stats.win_time) ? a.stats.win_time : Infinity;
+        const timeB = (b.stats && b.stats.win_time) ? b.stats.win_time : Infinity;
+        return timeA - timeB;
+      })
+      .slice(0, 3)
+      .map(u => u.nickname);
+  }
 
   return NextResponse.json({ users, winners });
 }

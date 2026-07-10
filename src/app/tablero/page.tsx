@@ -553,15 +553,14 @@ export default function Tablero() {
         <>
           <main className="container">
             {winners.length > 0 && (
-              <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
-                <img src="/cake_30.jpg" alt="Cake 30" style={{width: '120px', margin: '0 auto 10px auto', display: 'block', borderRadius: '15px'}} />
-                🥁 ¡mis 30 - Lautaro! 🥁<br/><br/>
-                <span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>
-                  ¡El podio está formado!<br/>
-                  🥇 {winners[0]}<br/>
-                  {winners[1] && `🥈 ${winners[1]}`}<br/>
-                  {winners[2] && `🥉 ${winners[2]}`}
-                </span>
+              <div className="podium-overlay">
+                <img src="/cake_30.jpg" alt="Cake 30" className="podium-cake" />
+                <div className="podium-title">¡EL PODIO ESTÁ FORMADO!</div>
+                <div className="podium-list">
+                  {winners[0] && <div>🥇 {winners[0]}</div>}
+                  {winners[1] && <div>🥈 {winners[1]}</div>}
+                  {winners[2] && <div>🥉 {winners[2]}</div>}
+                </div>
               </div>
             )}
 

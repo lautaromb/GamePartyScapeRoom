@@ -15,9 +15,13 @@ export async function POST(req: Request) {
   const user = users.find(u => u.id === userId);
   if (!user) return NextResponse.json({ error: 'Usuario no encontrado. Vuelve a iniciar sesión.' }, { status: 404 });
 
-  const winners = users.filter(u => u.score >= 30).sort((a,b) => b.score - a.score);
-  if (winners.length >= 3) {
-    return NextResponse.json({ error: `El juego ya terminó. ¡Ya tenemos nuestro podio de ganadores!` }, { status: 400 });
+  if (user.score >= 30) {
+    return NextResponse.json({ error: 'Ya llegaste a 30 puntos, ¡estás en el podio! Espera a que termine el juego.' }, { status: 400 });
+  }
+
+  const usersFinished = users.filter(u => u.score >= 30);
+  if (usersFinished.length >= 3) {
+    return NextResponse.json({ error: `El juego ya terminó. ¡Ya tenemos nuestro podio de 3 ganadores!` }, { status: 400 });
   }
 
   // 2. Buscar código
@@ -62,6 +66,10 @@ export async function POST(req: Request) {
     if (stats.first_finder_count >= 3 && !trophies.includes('Sabueso')) {
       trophies.push('Sabueso');
     }
+  }
+
+  if (newScore >= 30 && user.score < 30) {
+    stats.win_time = Date.now();
   }
 
   const { error: updateUserError } = await supabase
