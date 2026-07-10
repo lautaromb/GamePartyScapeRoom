@@ -139,6 +139,27 @@ export default function Tablero() {
     }
   }, [lockUntil]);
 
+  const manuallyCheckEvent = async () => {
+    setLoading(true);
+    try {
+      const ts = Date.now();
+      const resEv = await fetch(`/api/events?t=${ts}`);
+      const dataEv = await resEv.json();
+      
+      if (dataEv.event) {
+        setActiveEvent(dataEv.event);
+        setEventCategory(null);
+        setEventDone(false);
+        setEventResults(null);
+      } else {
+        alert("Aún no hay ningún evento activo. ¡Esperá el aviso por micrófono!");
+      }
+    } catch (e) {
+      alert("Error de conexión al buscar el evento.");
+    }
+    setLoading(false);
+  };
+
   // Event Timer
   useEffect(() => {
     if (activeEvent && activeEvent.status === 'active' && !eventDone) {
@@ -366,6 +387,15 @@ export default function Tablero() {
             {me.score} / 30
           </div>
         </div>
+
+        <button 
+          className="btn-slime" 
+          style={{ width: '100%', marginBottom: '1.5rem', background: '#ff6b6b', padding: '1rem', fontSize: '1.2rem', animation: 'pulse 2s infinite' }}
+          onClick={manuallyCheckEvent}
+          disabled={loading}
+        >
+          {loading ? 'BUSCANDO...' : '🚨 ENTRAR A TRIVIA EN VIVO 🚨'}
+        </button>
 
         {activeTab === 'misiones' && (
           <div>
