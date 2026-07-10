@@ -129,7 +129,7 @@ export default function AdminSecreto() {
     // Automatizar el finalizado a los 45 segundos
     if (activeTimeouts.current[id]) clearTimeout(activeTimeouts.current[id]);
     activeTimeouts.current[id] = setTimeout(() => {
-      handleFinishEvent(id);
+      handleFinishEvent(id, true);
     }, 45000);
   };
 
@@ -149,7 +149,7 @@ export default function AdminSecreto() {
     }, 20000);
   };
 
-  const handleFinishEvent = async (id: string) => {
+  const handleFinishEvent = async (id: string, isAuto: boolean = false) => {
     if (activeTimeouts.current[id]) clearTimeout(activeTimeouts.current[id]);
     const res = await fetch('/api/events/finish', {
       method: 'POST',
@@ -157,7 +157,7 @@ export default function AdminSecreto() {
       body: JSON.stringify({ adminPassword: password, eventId: id })
     });
     if (res.ok) {
-      alert('Evento Finalizado y Puntos Repartidos Automáticamente');
+      if (!isAuto) alert('Evento Finalizado y Puntos Repartidos Manualmente');
       fetchEvents();
     }
   };

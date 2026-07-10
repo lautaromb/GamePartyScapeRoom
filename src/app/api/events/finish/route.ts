@@ -96,5 +96,32 @@ export async function GET(req: Request) {
   if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 });
   
   const { data: answers } = await supabase.from('event_answers').select('*, users(nickname, avatar)').eq('event_id', eventId);
-  return NextResponse.json({ answers: answers || [] });
+  const processedAnswers = answers || [];
+
+  const categories = ['music', 'movies', 'sports', 'general'];
+  for (const cat of categories) {
+    const catAnswers = processedAnswers.filter(a => a.category === cat).sort((a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime());
+    const correctAnswers = catAnswers.filter(a => a.is_correct);
+    if (correctAnswers.length > 0) {
+      const firstTime = new Date(correctAnswers[0].answered_at).getTime();
+      const winners = correctAnswers.filter(a => Math.abs(new Date(a.answered_at).getTime() - firstTime) < 1000);
+      const isTie = winners.length > 1;
+      const firstPlacePoints = isTie ? 2 : 3;
+
+      for (let ans of catAnswers) {
+        if (!ans.is_correct) {
+          ans.pts_awarded = 0;
+        } else {
+          const isWinner = winners.some(w => w.id === ans.id);
+          ans.pts_awarded = isWinner ? firstPlacePoints : 1;
+        }
+      }
+    } else {
+      for (let ans of catAnswers) {
+        ans.pts_awarded = 0;
+      }
+    }
+  }
+
+  return NextResponse.json({ answers: processedAnswers });
 }
