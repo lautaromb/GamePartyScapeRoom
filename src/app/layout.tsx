@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'JUMANJI - La Aventura',
+  title: 'mis 30 - Lautaro - La Aventura',
   description: 'Sobrevive a la jungla descubriendo los códigos.',
 };
 

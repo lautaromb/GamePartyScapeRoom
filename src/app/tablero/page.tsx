@@ -20,6 +20,14 @@ export default function Tablero() {
   const [code, setCode] = useState('');
   const [msg, setMsg] = useState({ text: '', type: '' });
 
+  // Event State
+  const [activeEvent, setActiveEvent] = useState<any>(null);
+  const [eventCategory, setEventCategory] = useState<string | null>(null);
+  const [eventAnswer, setEventAnswer] = useState('');
+  const [eventTimeLeft, setEventTimeLeft] = useState(45);
+  const [eventDone, setEventDone] = useState(false);
+  const [eventResults, setEventResults] = useState<any>(null);
+
   const fetchData = async () => {
     try {
       const userId = localStorage.getItem('userId');
@@ -42,6 +50,20 @@ export default function Tablero() {
       const dataMissions = await resMissions.json();
       setMissions(dataMissions.missions);
 
+      // Fetch active event
+      const resEv = await fetch('/api/events');
+      const dataEv = await resEv.json();
+      if (dataEv.event) {
+        if (!activeEvent || activeEvent.id !== dataEv.event.id) {
+          setActiveEvent(dataEv.event);
+          setEventCategory(null);
+          setEventDone(false);
+          setEventResults(null);
+        }
+      } else {
+        setActiveEvent(null);
+      }
+
     } catch (e) {
       console.error(e);
     }
@@ -55,11 +77,12 @@ export default function Tablero() {
     fetchData();
 
     const channel = supabase.channel('realtime-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
         fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'codes' }, () => {
-        fetchData();
+        // If an event finished, fetch results
+        if(activeEvent) fetchEventResults(activeEvent.id);
       })
       .subscribe();
 
@@ -68,10 +91,8 @@ export default function Tablero() {
       setLockUntil(parseInt(storedLock));
     }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+    return () => { supabase.removeChannel(channel); };
+  }, [router, activeEvent]);
 
   useEffect(() => {
     if (lockUntil && lockUntil > Date.now()) {
@@ -90,6 +111,53 @@ export default function Tablero() {
       setLockUntil(null);
     }
   }, [lockUntil]);
+
+  // Event Timer
+  useEffect(() => {
+    if (activeEvent && activeEvent.status === 'active' && !eventDone) {
+      const started = new Date(activeEvent.started_at).getTime();
+      const interval = setInterval(() => {
+        const left = Math.ceil(45 - (Date.now() - started) / 1000);
+        if (left <= 0) {
+          setEventTimeLeft(0);
+          setEventDone(true);
+          fetchEventResults(activeEvent.id);
+          clearInterval(interval);
+        } else {
+          setEventTimeLeft(left);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [activeEvent, eventDone]);
+
+  const fetchEventResults = async (eventId: string) => {
+    const res = await fetch(`/api/events/finish?eventId=${eventId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setEventResults(data.answers);
+    }
+  };
+
+  const handleEventSubmit = async () => {
+    if (!eventAnswer.trim() || !eventCategory) return;
+    setLoading(true);
+    const res = await fetch('/api/events/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: activeEvent.id, userId: me.id, category: eventCategory, answer: eventAnswer })
+    });
+    const data = await res.json();
+    setEventDone(true);
+    setLoading(false);
+    if (data.isCorrect) {
+      alert('¡Respuesta enviada! Es correcta. Espera los resultados.');
+    } else if (res.ok) {
+      alert('Respuesta enviada. Espera los resultados.');
+    } else {
+      alert(data.error || 'Error al enviar');
+    }
+  };
 
   const handleSubmit = async (submitCode: string) => {
     if (!submitCode.trim()) return;
@@ -144,12 +212,101 @@ export default function Tablero() {
 
   const isLocked = lockUntil !== null && lockSecondsLeft > 0;
 
+  // EVENT OVERLAY UI
+  if (activeEvent && activeEvent.status !== 'idle') {
+    return (
+      <main className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', background: '#0a0a0a' }}>
+        <h1 className="spooky-title" style={{ fontSize: '2.5rem', animation: 'pulse 1.5s infinite' }}>🚨 EVENTO GLOBAL 🚨</h1>
+        
+        {!eventDone ? (
+          <>
+            <div style={{ textAlign: 'center', fontSize: '3rem', fontWeight: 'bold', color: eventTimeLeft <= 10 ? '#ff6b6b' : 'var(--accent-primary)', marginBottom: '1rem' }}>
+              00:{eventTimeLeft.toString().padStart(2, '0')}
+            </div>
+
+            {!eventCategory ? (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#fff' }}>Elige tu categoría (¡Rápido!)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <button className="btn-slime" style={{ background: '#3b82f6' }} onClick={() => setEventCategory('music')}>🎵 Música</button>
+                  <button className="btn-slime" style={{ background: '#eab308', color: '#000' }} onClick={() => setEventCategory('movies')}>🎬 Cine/Series</button>
+                  <button className="btn-slime" style={{ background: '#22c55e' }} onClick={() => setEventCategory('sports')}>⚽ Deportes</button>
+                  <button className="btn-slime" style={{ background: '#a855f7' }} onClick={() => setEventCategory('general')}>🌎 Conocimiento</button>
+                </div>
+              </div>
+            ) : (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ textTransform: 'uppercase', color: 'var(--accent-secondary)', fontWeight: 'bold', marginBottom: '1rem' }}>Categoría: {eventCategory}</div>
+                <h2 style={{ color: '#fff', fontSize: '1.4rem', marginBottom: '2rem' }}>
+                  {eventCategory === 'music' && activeEvent.q_music}
+                  {eventCategory === 'movies' && activeEvent.q_movies}
+                  {eventCategory === 'sports' && activeEvent.q_sports}
+                  {eventCategory === 'general' && activeEvent.q_general}
+                </h2>
+                
+                <input 
+                  type="text" 
+                  value={eventAnswer}
+                  onChange={(e) => setEventAnswer(e.target.value)}
+                  placeholder="Tu respuesta exacta..."
+                  className="input-spooky"
+                  style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}
+                />
+                <button className="btn-slime" onClick={handleEventSubmit} disabled={loading}>
+                  {loading ? 'ENVIANDO...' : '¡RESPONDER!'}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="glass" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+            <h2 style={{ textAlign: 'center', color: 'var(--accent-primary)', marginBottom: '1rem' }}>¡TIEMPO AGOTADO!</h2>
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Esperando que el Guardián finalice el evento para ver los resultados...</p>
+            
+            {eventResults && (
+              <div style={{ marginTop: '2rem' }}>
+                <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Resultados Oficiales (Correctas)</h3>
+                
+                {['music', 'movies', 'sports', 'general'].map(cat => {
+                  const ans = eventResults.filter((a: any) => a.category === cat);
+                  if (ans.length === 0) return null;
+                  
+                  // sort to find winner
+                  ans.sort((a:any, b:any) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime());
+                  const firstTime = new Date(ans[0].answered_at).getTime();
+
+                  return (
+                    <div key={cat} style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px' }}>
+                      <strong style={{ textTransform: 'uppercase', color: 'var(--accent-secondary)' }}>{cat}</strong>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        {ans.map((a: any) => {
+                          const isWinner = Math.abs(new Date(a.answered_at).getTime() - firstTime) < 1000;
+                          return (
+                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                              <span>{isWinner ? '👑' : '✅'} {a.users?.nickname || 'Jugador'}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(a.answered_at).toLocaleTimeString()}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    );
+  }
+
+  // NORMAL GAME UI
   return (
     <>
       <main className="container">
         {winner && (
           <div style={{background: 'var(--accent-primary)', color: '#000', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 0 30px var(--accent-primary)', fontFamily: 'Macondo'}}>
-            🥁 ¡JUMANJI! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
+            🥁 ¡mis 30 - Lautaro! 🥁<br/><br/><span style={{fontSize:'1.2rem', fontFamily: 'Outfit'}}>{winner} ha escapado de la jungla primero.</span>
           </div>
         )}
 
@@ -191,6 +348,13 @@ export default function Tablero() {
                     <strong style={{color: m.isFoundByMe ? 'var(--accent-primary)' : '#fff', fontSize: '1.2rem'}}>{m.title}</strong>
                     {m.isFoundByMe ? <CheckCircle2 color="var(--accent-primary)"/> : <AlertCircle color="var(--accent-secondary)"/>}
                   </div>
+                  {m.imageUrl && (
+                    <img 
+                      src={m.imageUrl} 
+                      alt="Pista visual" 
+                      style={{ width: '100%', borderRadius: '8px', marginBottom: '10px', border: '1px solid var(--accent-primary)' }} 
+                    />
+                  )}
                   <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '10px' }}>"{m.hint}"</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 'bold' }}>
                     <span style={{color: 'var(--accent-primary)'}}>{m.isFoundByMe ? '¡Completada!' : `Recompensa: ${m.points} puntos`}</span>

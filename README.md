@@ -1,4 +1,4 @@
-# 🌴 JUMANJI - Escape Room interactivo
+# 🌴 mis 30 - Lautaro - Escape Room interactivo
 
 Este proyecto es una aplicación web *mobile-first* diseñada para un cumpleaños temático. Funciona como una búsqueda del tesoro / escape room interactivo donde los invitados (~30 personas) deben encontrar códigos ocultos por la casa y resolver acertijos para ganar puntos.
 
@@ -10,7 +10,7 @@ Este proyecto es una aplicación web *mobile-first* diseñada para un cumpleaño
 - **Perfiles:** Los jugadores inician sesión simplemente eligiendo un Nickname y un "espíritu de la jungla" (Avatar de animal o fruta). La sesión se mantiene abierta toda la noche mediante `localStorage`.
 
 ## 🎨 Temática y Diseño Visual
-- **Temática:** **Jumanji**. Aventura, jungla profunda, madera antigua y misterio.
+- **Temática:** **mis 30 - Lautaro**. Aventura, jungla profunda, madera antigua y misterio.
 - **Tipografía:** Se utiliza la fuente mágica `Macondo` para los títulos y `Outfit` para la lectura.
 - **UI/UX:** Diseño optimizado para celulares (*Mobile-First*). Cuenta con una barra de navegación inferior (Bottom Nav) con tres pestañas:
   1. **Misiones:** Tarjetas visuales con acertijos públicos. Al resolverlos y tocar la tarjeta, se ingresa la respuesta.

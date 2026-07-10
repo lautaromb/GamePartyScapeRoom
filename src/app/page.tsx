@@ -42,7 +42,7 @@ export default function Home() {
 
   return (
     <main className="container">
-      <h1 className="spooky-title">JUMANJI</h1>
+      <h1 className="spooky-title">mis 30 - Lautaro</h1>
       
       <div className="glass" style={{ padding: '2rem', textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '1.1rem' }}>

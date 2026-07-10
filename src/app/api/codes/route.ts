@@ -3,7 +3,7 @@ import { supabase } from '@/lib/db';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
-  const { code, firstUserPoints, subsequentPoints, adminPassword, title, hint } = await req.json();
+  const { code, firstUserPoints, subsequentPoints, adminPassword, title, hint, imageUrl } = await req.json();
   if (adminPassword !== 'misterio90') {
     return NextResponse.json({ error: 'Acceso Denegado' }, { status: 401 });
   }
@@ -33,7 +33,8 @@ export async function POST(req: Request) {
       subsequentPoints: parseInt(subsequentPoints),
       foundBy: [],
       title: title || null,
-      hint: hint || null
+      hint: hint || null,
+      image_url: imageUrl || null
     });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     id: c.id,
     title: c.title || 'Misión Secreta',
     hint: c.hint,
+    imageUrl: c.image_url,
     points: c.firstUserPoints,
     isFoundByMe: userId && c.foundBy ? c.foundBy.includes(userId) : false,
     totalFound: c.foundBy ? c.foundBy.length : 0
