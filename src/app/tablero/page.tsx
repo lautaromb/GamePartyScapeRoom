@@ -259,8 +259,9 @@ export default function Tablero() {
           setEventTimeLeft(left);
         }
         
-        // 2. Failsafe Poll solo cada 10 segs
-        if (left % 10 === 0 && left > 0 && left < duration) {
+        // 2. Failsafe Poll
+        const shouldPoll = (isWaiting && left <= 0 && Math.abs(left) % 2 === 0) || (left > 0 && left % 5 === 0);
+        if (shouldPoll) {
           try {
             const res = await fetch(`/api/events?t=${Date.now()}`);
             const data = await res.json();
