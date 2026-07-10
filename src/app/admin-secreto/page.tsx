@@ -185,9 +185,27 @@ export default function AdminSecreto() {
     );
   }
 
+  const handleResetGame = async () => {
+    if (!confirm('🚨 ¡CUIDADO! 🚨\n\n¿Estás SEGURO de que quieres borrar a todos los jugadores y resetear todo el progreso? Las preguntas de la trivia se conservarán intactas.')) return;
+    
+    const res = await fetch(`/api/reset?password=${password}`);
+    if (res.ok) {
+      alert('¡SISTEMA RESETEADO CON ÉXITO!');
+      fetchCodes();
+      fetchEvents();
+    } else {
+      alert('Error al resetear.');
+    }
+  };
+
   return (
     <main className="container">
-      <h1 className="spooky-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Tablero Mágico</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 className="spooky-title" style={{ fontSize: '2.5rem', margin: 0 }}>Tablero Mágico</h1>
+        <button onClick={handleResetGame} style={{ background: '#ff3333', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 0 10px rgba(255,50,50,0.5)' }}>
+          ☢️ RESETEAR JUEGO
+        </button>
+      </div>
       
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
         <button className="btn-slime btn-dark" style={{ flex: 1, opacity: activeTab === 'codes' ? 1 : 0.5 }} onClick={() => setActiveTab('codes')}>Misiones</button>
