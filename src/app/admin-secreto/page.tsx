@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { premadeEvents } from '@/data/premadeEvents';
 
 export default function AdminSecreto() {
   const [password, setPassword] = useState('');
   const [auth, setAuth] = useState(false);
-  const [activeTab, setActiveTab] = useState('codes'); // 'codes' | 'events'
+  const [activeTab, setActiveTab] = useState('codes'); 
   
   // Codes State
   const [code, setCode] = useState('');
@@ -18,7 +19,16 @@ export default function AdminSecreto() {
 
   // Events State
   const [eventsList, setEventsList] = useState<any[]>([]);
-  const [ev, setEv] = useState({ qm: '', am: '', qc: '', ac: '', qs: '', as: '', qg: '', ag: '' });
+  
+  const defaultEvState = {
+    music: { q: '', correct: '', wrong: ['', '', ''] },
+    movies: { q: '', correct: '', wrong: ['', '', ''] },
+    sports: { q: '', correct: '', wrong: ['', '', ''] },
+    general: { q: '', correct: '', wrong: ['', '', ''] }
+  };
+  
+  const [ev, setEv] = useState<any>(JSON.parse(JSON.stringify(defaultEvState)));
+  const [selectedPremadeId, setSelectedPremadeId] = useState('');
 
   const fetchCodes = async () => {
     const res = await fetch(`/api/codes?adminPassword=${password}`);
@@ -66,21 +76,37 @@ export default function AdminSecreto() {
     }
   };
 
+  const handleLoadPremade = (id: string) => {
+    setSelectedPremadeId(id);
+    const found = premadeEvents.find(e => e.id === id);
+    if (found) {
+      setEv(JSON.parse(JSON.stringify(found.questions)));
+    }
+  };
+
+  const handleUpdateEv = (cat: string, field: string, value: string, wrongIdx?: number) => {
+    const newEv = { ...ev };
+    if (field === 'wrong' && wrongIdx !== undefined) {
+      newEv[cat].wrong[wrongIdx] = value;
+    } else {
+      newEv[cat][field] = value;
+    }
+    setEv(newEv);
+  };
+
   const handleCreateEvent = async () => {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         adminPassword: password,
-        q_music: ev.qm, ans_music: ev.am,
-        q_movies: ev.qc, ans_movies: ev.ac,
-        q_sports: ev.qs, ans_sports: ev.as,
-        q_general: ev.qg, ans_general: ev.ag
+        questions: ev
       })
     });
     if (res.ok) {
       alert('Evento Creado');
-      setEv({ qm: '', am: '', qc: '', ac: '', qs: '', as: '', qg: '', ag: '' });
+      setEv(JSON.parse(JSON.stringify(defaultEvState)));
+      setSelectedPremadeId('');
       fetchEvents();
     } else {
       alert('Error creando evento');
@@ -111,17 +137,24 @@ export default function AdminSecreto() {
     }
   };
 
+  const renderEventForm = (cat: string, label: string, color: string) => (
+    <div style={{background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '8px', marginBottom: '15px', borderLeft: `4px solid ${color}`}}>
+      <h4 style={{color, marginTop: 0}}>{label}</h4>
+      <input type="text" placeholder="Pregunta" value={ev[cat].q} onChange={e => handleUpdateEv(cat, 'q', e.target.value)} className="input-spooky" style={{marginBottom: '10px'}}/>
+      <input type="text" placeholder="Respuesta Correcta" value={ev[cat].correct} onChange={e => handleUpdateEv(cat, 'correct', e.target.value)} className="input-spooky" style={{borderColor: '#4ade80'}}/>
+      <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+        <input type="text" placeholder="Falsa 1" value={ev[cat].wrong[0]} onChange={e => handleUpdateEv(cat, 'wrong', e.target.value, 0)} className="input-spooky" style={{borderColor: '#ef4444', marginBottom: 0}}/>
+        <input type="text" placeholder="Falsa 2" value={ev[cat].wrong[1]} onChange={e => handleUpdateEv(cat, 'wrong', e.target.value, 1)} className="input-spooky" style={{borderColor: '#ef4444', marginBottom: 0}}/>
+        <input type="text" placeholder="Falsa 3" value={ev[cat].wrong[2]} onChange={e => handleUpdateEv(cat, 'wrong', e.target.value, 2)} className="input-spooky" style={{borderColor: '#ef4444', marginBottom: 0}}/>
+      </div>
+    </div>
+  );
+
   if (!auth) {
     return (
       <main className="container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
         <h1 style={{color: 'var(--accent-primary)', fontFamily: 'Rye', fontSize: '3rem', margin: '2rem 0'}}>Tablero Mágico</h1>
-        <input 
-          type="password" 
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder="Contraseña del Guardián..."
-          className="input-spooky"
-        />
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña..." className="input-spooky" />
         <button className="btn-slime btn-dark" onClick={handleLogin}>Ingresar</button>
       </main>
     );
@@ -132,9 +165,59 @@ export default function AdminSecreto() {
       <h1 className="spooky-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Tablero Mágico</h1>
       
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-        <button className="btn-slime btn-dark" style={{ flex: 1, opacity: activeTab === 'codes' ? 1 : 0.5 }} onClick={() => setActiveTab('codes')}>Códigos/Misiones</button>
-        <button className="btn-slime btn-dark" style={{ flex: 1, opacity: activeTab === 'events' ? 1 : 0.5 }} onClick={() => setActiveTab('events')}>Eventos Globales</button>
+        <button className="btn-slime btn-dark" style={{ flex: 1, opacity: activeTab === 'codes' ? 1 : 0.5 }} onClick={() => setActiveTab('codes')}>Misiones</button>
+        <button className="btn-slime btn-dark" style={{ flex: 1, opacity: activeTab === 'events' ? 1 : 0.5 }} onClick={() => setActiveTab('events')}>Eventos</button>
       </div>
+
+      {activeTab === 'events' && (
+        <>
+          <div className="glass" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+            <h3 style={{color: 'var(--accent-secondary)'}}>Crear Nuevo Evento (Múltiple Choice)</h3>
+            
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '5px'}}>Cargar Plantilla de los 90s (Opcional):</label>
+              <select className="input-spooky" value={selectedPremadeId} onChange={e => handleLoadPremade(e.target.value)}>
+                <option value="">-- Seleccionar un evento prearmado --</option>
+                {premadeEvents.map(pe => <option key={pe.id} value={pe.id}>{pe.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{marginTop: '1rem'}}>
+              {renderEventForm('music', '🎵 Música', '#3b82f6')}
+              {renderEventForm('movies', '🎬 Cine/Series', '#eab308')}
+              {renderEventForm('sports', '⚽ Deportes', '#22c55e')}
+              {renderEventForm('general', '🌎 Conocimiento General', '#a855f7')}
+            </div>
+            
+            <button className="btn-slime btn-dark" style={{marginTop: '1rem', width: '100%'}} onClick={handleCreateEvent}>Guardar Evento en Cola</button>
+          </div>
+
+          <div className="glass" style={{ padding: '1.5rem' }}>
+            <h3 style={{color: 'var(--accent-secondary)'}}>Eventos Creados</h3>
+            <div style={{marginTop: '1rem'}}>
+              {eventsList.map((e, idx) => (
+                <div key={e.id} style={{ borderBottom: '1px solid var(--border-color)', padding: '15px 0'}}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                    <strong style={{color: '#fff', fontSize: '1.2rem'}}>Evento #{eventsList.length - idx}</strong>
+                    <span style={{
+                      background: e.status === 'active' ? '#ff6b6b' : e.status === 'finished' ? '#4CAF50' : 'var(--text-muted)',
+                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase'
+                    }}>{e.status}</span>
+                  </div>
+                  
+                  {e.status === 'idle' && (
+                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%'}} onClick={() => handleLaunchEvent(e.id)}>LANZAR AHORA</button>
+                  )}
+                  {e.status === 'active' && (
+                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', width: '100%', background: 'var(--accent-secondary)'}} onClick={() => handleFinishEvent(e.id)}>FINALIZAR Y REPARTIR PUNTOS</button>
+                  )}
+                </div>
+              ))}
+              {eventsList.length === 0 && <p style={{color: 'var(--text-muted)'}}>No hay eventos creados.</p>}
+            </div>
+          </div>
+        </>
+      )}
 
       {activeTab === 'codes' && (
         <>
@@ -179,59 +262,6 @@ export default function AdminSecreto() {
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {activeTab === 'events' && (
-        <>
-          <div className="glass" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-            <h3 style={{color: 'var(--accent-secondary)'}}>Crear Nuevo Evento (Trivia x4)</h3>
-            
-            <div style={{marginTop: '1rem'}}>
-              <h4 style={{color: '#fff'}}>🎵 Música</h4>
-              <input type="text" placeholder="Pregunta" value={ev.qm} onChange={e => setEv({...ev, qm: e.target.value})} className="input-spooky" style={{marginBottom: '5px'}}/>
-              <input type="text" placeholder="Respuesta" value={ev.am} onChange={e => setEv({...ev, am: e.target.value})} className="input-spooky"/>
-
-              <h4 style={{color: '#fff', marginTop: '10px'}}>🎬 Cine/Series</h4>
-              <input type="text" placeholder="Pregunta" value={ev.qc} onChange={e => setEv({...ev, qc: e.target.value})} className="input-spooky" style={{marginBottom: '5px'}}/>
-              <input type="text" placeholder="Respuesta" value={ev.ac} onChange={e => setEv({...ev, ac: e.target.value})} className="input-spooky"/>
-
-              <h4 style={{color: '#fff', marginTop: '10px'}}>⚽ Deportes</h4>
-              <input type="text" placeholder="Pregunta" value={ev.qs} onChange={e => setEv({...ev, qs: e.target.value})} className="input-spooky" style={{marginBottom: '5px'}}/>
-              <input type="text" placeholder="Respuesta" value={ev.as} onChange={e => setEv({...ev, as: e.target.value})} className="input-spooky"/>
-
-              <h4 style={{color: '#fff', marginTop: '10px'}}>🌎 Conocimiento General</h4>
-              <input type="text" placeholder="Pregunta" value={ev.qg} onChange={e => setEv({...ev, qg: e.target.value})} className="input-spooky" style={{marginBottom: '5px'}}/>
-              <input type="text" placeholder="Respuesta" value={ev.ag} onChange={e => setEv({...ev, ag: e.target.value})} className="input-spooky"/>
-            </div>
-            
-            <button className="btn-slime btn-dark" style={{marginTop: '1rem'}} onClick={handleCreateEvent}>Crear Evento</button>
-          </div>
-
-          <div className="glass" style={{ padding: '1.5rem' }}>
-            <h3 style={{color: 'var(--accent-secondary)'}}>Eventos Creados</h3>
-            <div style={{marginTop: '1rem'}}>
-              {eventsList.map((e, idx) => (
-                <div key={e.id} style={{ borderBottom: '1px solid var(--border-color)', padding: '15px 0'}}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
-                    <strong style={{color: '#fff', fontSize: '1.2rem'}}>Evento #{eventsList.length - idx}</strong>
-                    <span style={{
-                      background: e.status === 'active' ? '#ff6b6b' : e.status === 'finished' ? '#4CAF50' : 'var(--text-muted)',
-                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase'
-                    }}>{e.status}</span>
-                  </div>
-                  
-                  {e.status === 'idle' && (
-                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem'}} onClick={() => handleLaunchEvent(e.id)}>LANZAR AHORA</button>
-                  )}
-                  {e.status === 'active' && (
-                    <button className="btn-slime" style={{padding: '0.5rem', fontSize: '0.9rem', background: 'var(--accent-secondary)'}} onClick={() => handleFinishEvent(e.id)}>FINALIZAR Y REPARTIR PUNTOS</button>
-                  )}
-                </div>
-              ))}
-              {eventsList.length === 0 && <p style={{color: 'var(--text-muted)'}}>No hay eventos creados.</p>}
             </div>
           </div>
         </>

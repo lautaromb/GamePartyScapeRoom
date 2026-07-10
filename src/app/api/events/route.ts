@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import crypto from 'crypto';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const { data, error } = await supabase
@@ -20,10 +21,7 @@ export async function POST(req: Request) {
   
   const { error } = await supabase.from('events').insert({
     id: crypto.randomUUID(),
-    q_music: body.q_music, ans_music: body.ans_music,
-    q_movies: body.q_movies, ans_movies: body.ans_movies,
-    q_sports: body.q_sports, ans_sports: body.ans_sports,
-    q_general: body.q_general, ans_general: body.ans_general,
+    questions: body.questions,
     status: 'idle'
   });
   

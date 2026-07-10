@@ -1,39 +1,37 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import crypto from 'crypto';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const { eventId, userId, category, answer } = await req.json();
   
+  // 1. Fetch Event
   const { data: event, error: eventErr } = await supabase.from('events').select('*').eq('id', eventId).single();
-  if (!event || event.status !== 'active') return NextResponse.json({ error: 'Evento no activo' }, { status: 400 });
-  
-  const startedAt = new Date(event.started_at).getTime();
-  const now = Date.now();
-  if (now - startedAt > 50000) return NextResponse.json({ error: 'Tiempo agotado' }, { status: 400 });
-  
+  if (eventErr || !event) return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
+  if (event.status !== 'active') return NextResponse.json({ error: 'Evento cerrado' }, { status: 400 });
+
+  // 2. Comprobar si ya respondió
   const { data: existing } = await supabase.from('event_answers').select('*').eq('event_id', eventId).eq('user_id', userId).single();
-  if (existing) return NextResponse.json({ error: 'Ya respondiste' }, { status: 400 });
-  
-  let correctAns = '';
-  if (category === 'music') correctAns = event.ans_music;
-  else if (category === 'movies') correctAns = event.ans_movies;
-  else if (category === 'sports') correctAns = event.ans_sports;
-  else if (category === 'general') correctAns = event.ans_general;
-  
-  const isCorrect = correctAns && correctAns.trim().toLowerCase() === answer.trim().toLowerCase();
-  
+  if (existing) return NextResponse.json({ error: 'Ya respondiste este evento' }, { status: 400 });
+
+  // 3. Validar respuesta correcta desde JSON
+  const catData = event.questions[category];
+  if (!catData) return NextResponse.json({ error: 'Categoría inválida' }, { status: 400 });
+
+  const isCorrect = answer === catData.correct;
+
+  // 4. Guardar respuesta
   const { error: insErr } = await supabase.from('event_answers').insert({
     id: crypto.randomUUID(),
     event_id: eventId,
     user_id: userId,
     category,
     answer,
-    is_correct: isCorrect,
-    answered_at: new Date().toISOString()
+    is_correct: isCorrect
   });
-  
+
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
-  
+
   return NextResponse.json({ success: true, isCorrect });
 }

@@ -243,22 +243,37 @@ export default function Tablero() {
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ textTransform: 'uppercase', color: 'var(--accent-secondary)', fontWeight: 'bold', marginBottom: '1rem' }}>Categoría: {eventCategory}</div>
                 <h2 style={{ color: '#fff', fontSize: '1.4rem', marginBottom: '2rem' }}>
-                  {eventCategory === 'music' && activeEvent.q_music}
-                  {eventCategory === 'movies' && activeEvent.q_movies}
-                  {eventCategory === 'sports' && activeEvent.q_sports}
-                  {eventCategory === 'general' && activeEvent.q_general}
+                  {activeEvent.questions && activeEvent.questions[eventCategory]?.q}
                 </h2>
                 
-                <input 
-                  type="text" 
-                  value={eventAnswer}
-                  onChange={(e) => setEventAnswer(e.target.value)}
-                  placeholder="Tu respuesta exacta..."
-                  className="input-spooky"
-                  style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}
-                />
-                <button className="btn-slime" onClick={handleEventSubmit} disabled={loading}>
-                  {loading ? 'ENVIANDO...' : '¡RESPONDER!'}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(() => {
+                    const qData = activeEvent.questions?.[eventCategory];
+                    if (!qData) return null;
+                    
+                    // Solo mezclamos una vez usando una semilla simple o simplemente al renderizar (idealmente deberia estar en un useEffect pero para este minijuego un sort rapido sirve, aunque react puede re-renderizar y cambiar el orden, asi que usemos el eventCategory string length + options como semilla falsa)
+                    // Mejor lo hacemos en un array determinista basado en el ID de evento para que no parpadee:
+                    const options = [qData.correct, ...qData.wrong];
+                    // Un shuffle simple que no cambia por re-render (determinista)
+                    options.sort((a, b) => (a.length - b.length) > 0 ? 1 : -1);
+                    // Como el sort por length puede ser predecible, metemos una rotación básica
+                    const rotated = [...options.slice(1), options[0]];
+
+                    return rotated.map((opt, i) => (
+                      <button 
+                        key={i} 
+                        className="btn-slime" 
+                        style={{ fontSize: '1.1rem', padding: '1rem', background: eventAnswer === opt ? 'var(--accent-secondary)' : 'var(--bg-card)', color: '#fff' }}
+                        onClick={() => setEventAnswer(opt)}
+                      >
+                        {opt}
+                      </button>
+                    ));
+                  })()}
+                </div>
+
+                <button className="btn-slime btn-dark" style={{ marginTop: 'auto' }} onClick={handleEventSubmit} disabled={loading || !eventAnswer}>
+                  {loading ? 'ENVIANDO...' : '¡ENVIAR RESPUESTA!'}
                 </button>
               </div>
             )}
