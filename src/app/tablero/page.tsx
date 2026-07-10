@@ -288,6 +288,16 @@ export default function Tablero() {
     }
   }, [activeEvent, eventDone]);
 
+  // Auto-reload after showing results for 10 seconds
+  useEffect(() => {
+    if (eventDone) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [eventDone]);
+
   const fetchEventResults = async (eventId: string) => {
     const res = await fetch(`/api/events/finish?eventId=${eventId}&t=${Date.now()}`);
     if (res.ok) {
@@ -511,7 +521,7 @@ export default function Tablero() {
                             <div key={idx} style={{ marginBottom: '10px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '4px' }}>
                                 <span>{ansText} {isCorrect ? '✅' : '❌'}</span>
-                                <span>{percentage}% ({count})</span>
+                                <span>{percentage}% eligió esto ({count} votos)</span>
                               </div>
                               <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
                                 <div style={{ 
@@ -537,7 +547,10 @@ export default function Tablero() {
                                 <span style={{ color: isWinner ? 'var(--accent-secondary)' : '#fff', fontWeight: isWinner ? 'bold' : 'normal' }}>
                                   {isWinner ? '👑' : '👏'} {a.users?.nickname || 'Jugador'}
                                 </span>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(a.answered_at).toLocaleTimeString()}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                  <strong style={{color: 'var(--accent-primary)', marginRight: '8px'}}>(+{a.pts_awarded} pts)</strong> 
+                                  {new Date(a.answered_at).toLocaleTimeString()}
+                                </span>
                               </div>
                             )
                           })}
