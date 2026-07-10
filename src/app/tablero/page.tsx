@@ -44,7 +44,12 @@ export default function Tablero() {
       });
       
       const myUser = dataUsers.users.find((u: any) => u.id === userId);
-      if (myUser) setMe(myUser);
+      if (myUser) {
+        setMe(myUser);
+      } else if (userId) {
+        localStorage.removeItem('userId');
+        router.push('/');
+      }
 
       const resMissions = await fetch(`/api/missions?userId=${userId}`);
       const dataMissions = await resMissions.json();
