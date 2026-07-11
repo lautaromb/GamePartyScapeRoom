@@ -422,7 +422,52 @@ export default function Tablero() {
             {activeEvent.status === 'waiting' ? (
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                 <h3 style={{color: 'var(--accent-secondary)', marginBottom: '1rem', fontSize: '1.8rem', textAlign: 'center'}}>⏳ Sala de Espera</h3>
-                <p style={{color: '#fff', fontSize: '1.1rem', textAlign: 'center'}}>Esperando a que los demás se unan... ¡La trivia está por comenzar!</p>
+                <p style={{color: '#fff', fontSize: '1.1rem', textAlign: 'center'}}>Esperando a que los demás se unan...</p>
+              </div>
+            ) : activeEvent.questions?.isVoting ? (
+              <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                <h3 style={{ textAlign: 'center', color: '#fff', marginBottom: '1rem' }}>Votación: ¡Mejor Look! 👗👔</h3>
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Vota por la persona mejor vestida. Cada voto suma 1 punto directo a su puntaje.</p>
+                
+                {hasSubmitted ? (
+                  <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <h3 style={{color: 'var(--accent-primary)'}}>¡Tu voto fue registrado!</h3>
+                    <p style={{color: '#fff'}}>Esperando a que el anfitrión finalice la votación...</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+                    {users.filter(u => u.id !== me?.id).map((u) => (
+                      <button 
+                        key={u.id}
+                        className="btn-slime btn-dark" 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '15px', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            const res = await fetch('/api/events/vote', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ eventId: activeEvent.id, voterId: me?.id, votedUserId: u.id })
+                            });
+                            if (res.ok) {
+                              setHasSubmitted(true);
+                              playSfx('blip');
+                            } else {
+                              const data = await res.json();
+                              showToast(data.error, 'error');
+                              playSfx('error');
+                            }
+                          } catch(e) { showToast('Error', 'error'); }
+                          setLoading(false);
+                        }}
+                        disabled={loading}
+                      >
+                        <span style={{ fontSize: '1.5rem', marginRight: '15px' }}>{u.avatar}</span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#fff' }}>{u.nickname}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : !eventCategory ? (
               <div className="glass" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -488,7 +533,26 @@ export default function Tablero() {
               <div style={{ marginTop: '1rem' }}>
                 <h3 style={{ borderBottom: '1px solid var(--accent-primary)', paddingBottom: '0.5rem', marginBottom: '1rem', textAlign: 'center' }}>📊 Estadísticas de la Ronda</h3>
                 
-                {['music', 'movies', 'sports', 'general'].map(cat => {
+                {activeEvent?.questions?.isVoting ? (
+                  <div style={{ marginTop: '2rem' }}>
+                    <h4 style={{textAlign: 'center', color: 'var(--accent-secondary)', fontSize: '1.5rem', marginBottom: '1rem'}}>Resultados de la Votación</h4>
+                    {(() => {
+                      const votes: Record<string, number> = {};
+                      eventResults.forEach((r: any) => {
+                        votes[r.answer] = (votes[r.answer] || 0) + 1;
+                      });
+                      return Object.entries(votes).sort((a:any, b:any) => b[1]-a[1]).map(([uid, count]) => {
+                         const u = users.find(x => x.id === uid);
+                         return (
+                           <div key={uid} style={{display:'flex', justifyContent:'space-between', padding:'15px', background:'rgba(255,255,255,0.05)', marginBottom:'10px', borderRadius:'8px', border: '1px solid rgba(255,255,255,0.1)'}}>
+                             <span style={{fontSize: '1.2rem', color: '#fff'}}>{u?.avatar} {u?.nickname || 'Jugador eliminado'}</span>
+                             <strong style={{color:'var(--accent-primary)', fontSize: '1.2rem'}}>+{count as number} pts</strong>
+                           </div>
+                         )
+                      });
+                    })()}
+                  </div>
+                ) : ['music', 'movies', 'sports', 'general'].map(cat => {
                   const catAnswers = eventResults.filter((a: any) => a.category === cat);
                   if (catAnswers.length === 0) return null;
                   

@@ -234,6 +234,27 @@ export default function AdminSecreto() {
             
             <button className="btn-slime btn-dark" style={{marginTop: '1rem', width: '100%'}} onClick={handleCreateEvent}>Guardar Evento en Cola</button>
           </div>
+          
+          <div className="glass" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+            <h3 style={{color: '#a855f7'}}>👗 Evento Especial: Mejor Look</h3>
+            <p style={{color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem'}}>
+              Crea un evento de votación donde todos pueden votar por la persona mejor vestida. Cada voto otorga 1 punto directo.
+            </p>
+            <button className="btn-slime btn-dark" style={{width: '100%', background: '#a855f7'}} onClick={async () => {
+              if (!confirm('¿Lanzar Evento Especial de Votación?')) return;
+              const res = await fetch('/api/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminPassword: password, questions: { isVoting: true } })
+              });
+              if (res.ok) {
+                 alert('Evento Creado en Cola. ¡Abre la Sala de Espera desde la lista de abajo!');
+                 fetchEvents();
+              }
+            }}>
+              ✨ CREAR EVENTO DE VOTACIÓN
+            </button>
+          </div>
 
           <div className="glass" style={{ padding: '1.5rem' }}>
             <h3 style={{color: 'var(--accent-secondary)'}}>Eventos Creados</h3>

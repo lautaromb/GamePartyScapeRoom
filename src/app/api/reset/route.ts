@@ -21,9 +21,8 @@ export async function GET(req: Request) {
     // 3. Delete all users
     await supabase.from('users').delete().neq('id', 'dummy');
     
-    // 4. Reset found arrays in codes and missions
-    await supabase.from('codes').update({ foundByArray: [] }).neq('id', 'dummy');
-    await supabase.from('missions').update({ foundByArray: [] }).neq('id', 'dummy');
+    // 4. Reset found arrays in codes (missions are just codes with hints)
+    await supabase.from('codes').update({ foundBy: [] }).neq('id', 'dummy');
 
     return NextResponse.json({ 
       success: true, 
