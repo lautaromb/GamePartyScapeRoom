@@ -22,6 +22,7 @@ export default function Tablero() {
   const [users, setUsers] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
   const [winners, setWinners] = useState<string[]>([]);
+  const [showPodium, setShowPodium] = useState(true);
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
@@ -636,7 +637,7 @@ export default function Tablero() {
         // NORMAL GAME UI
         <>
           <main className="container">
-            {winners.length > 0 && (
+            {showPodium && winners.length > 0 && (
               <div className="podium-overlay">
                 <img src="/cake_30.jpg" alt="Cake 30" className="podium-cake" />
                 <div className="podium-title">¡EL PODIO ESTÁ FORMADO!</div>
@@ -645,6 +646,13 @@ export default function Tablero() {
                   {winners[1] && <div>🥈 {winners[1]}</div>}
                   {winners[2] && <div>🥉 {winners[2]}</div>}
                 </div>
+                <button 
+                  className="btn-slime btn-dark" 
+                  style={{ marginTop: '2rem', background: '#ff6b6b' }} 
+                  onClick={() => setShowPodium(false)}
+                >
+                  CERRAR Y VER TABLERO
+                </button>
               </div>
             )}
             {winners.length === 0 && me?.score >= 30 && (
